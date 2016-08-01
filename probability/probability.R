@@ -4,9 +4,117 @@ require(rgl)    # for persp3d
 library(distr)  # DiscreteDistribution
 
 ##############################################################################################
+# Univariant discrete random variable (LNp.5-3~LNp.5-11)
 #
-# The purpose of this project is to understand how distribution models are designed in R, and
-# their pdf/cdf. So as to cross reference with the NTHU Probability course.
+# DiscreteDistribution is used to create pmf/cdf/... from given random variable results.
+##############################################################################################
+data <- data.frame(trial1=c("h","h","h", "t", "h", "t", "t", "t"),
+                   trial2=c("h","h","t","h","t","h","t","t"),
+                   trial3=c("h","t","h","h","t","t","h","t"))
+
+# Generate the outcome of the three random variables x1, x2, x3
+data <- ddply(data, .(trial1, trial2, trial3), transform,
+              x1=(trial1=="h")+(trial2=="h")+(trial3=="h"),
+              x2=sum(trial1=="h"),
+              x3=(trial1=="h")+(trial2=="h")+(trial3=="h")-(trial1=="t")-(trial2=="t")-(trial3=="t"))
+
+# Calculate the probability and cumulative probability for x1, x2, x3
+x1 <- ddply(data, .(x1), summarize, freq=length(x1), prob=freq/nrow(data))
+x2 <- ddply(data, .(x2), summarize, freq=length(x2), prob=freq/nrow(data))
+x3 <- ddply(data, .(x3), summarize, freq=length(x3), prob=freq/nrow(data))
+x1$acc_prob <- cumsum(x1$prob)
+x2$acc_prob <- cumsum(x2$prob)
+x3$acc_prob <- cumsum(x3$prob)
+
+# Create pmf and cdf for x1 (x2, x3 are skipped)
+x1.dist <- DiscreteDistribution (supp = x1$x1, prob = x1$prob)
+x1.pmf <- d(x1.dist)  ## Probability mass function
+x1.cdf <- p(x1.dist)  ## Cumulative distribution function
+
+# One can actually use call such function
+x1.pmf(2)
+x1.pmf(3)
+x1.pmf(2.5) # No probability exists at 2.5
+x1.cdf(2.5) # probability exists at 2.5 due to cdf natural
+
+# cdf jumps at points with weight
+x1.pmf(0) == x1.cdf(0)
+x1.pmf(0) == x1.cdf(0.1)
+x1.pmf(0) == x1.cdf(0.9)
+x1.pmf(0) == x1.cdf(1)
+x1.pmf(0) + x1.pmf(1) == x1.cdf(1)
+# 1 = pmf(0) + pmf(1) + pmf(2) + pmf(3)
+# cdf(2) = pmf(0) + pmf(1) + pmf(2)
+x1.pmf(3) == 1 - x1.cdf(2)
+
+# Plot pmf/cdf
+plot(x1.dist)
+
+# FIXME: one way to plot the pmf/cdf is using ggplot stat_function, with the pmf/cdf created
+# above. However, the plotting is wrong. I think this is a bug.
+ggplot(x1, aes(x=x1)) + stat_function(fun=x1.pmf)
+ggplot(x1, aes(x=x1)) + stat_function(fun=x1.cdf)
+
+##############################################################################################
+# Univariant discrete random variable transformation (LNp.5-12)
+##############################################################################################
+data <- data.frame(trial1=c("h","h","h", "t", "h", "t", "t", "t"),
+                   trial2=c("h","h","t","h","t","h","t","t"),
+                   trial3=c("h","t","h","h","t","t","h","t"))
+
+# Generate the outcome of the three random variables x1
+data <- ddply(data, .(trial1, trial2, trial3), transform,
+              x1=(trial1=="h")+(trial2=="h")+(trial3=="h"))
+
+# Calculate the probability and cumulative probability for x1
+x1 <- ddply(data, .(x1), summarize, freq=length(x1), prob=freq/nrow(data))
+x1$acc_prob <- cumsum(x1$prob)
+x1.dist <- DiscreteDistribution (supp = x1$x1, prob = x1$prob)
+x1.pmf <- d(x1.dist)
+plot(x1.dist)
+
+# Assume a transformation Y1=g(X1): Y1=X1^2
+# Approach 1: map Y1 to the original sample space to get its pmf fy(Y=y)
+data$y1 <- data$x1^2
+y1 <- ddply(data, .(y1), summarize, freq=length(y1), prob=freq/nrow(data))
+y1$acc_prob <- cumsum(y1$prob)
+y1.dist <- DiscreteDistribution (supp = y1$y1, prob = y1$prob)
+y1.pmf <- d(y1.dist)
+plot(y1.dist)
+# Approach 2: replace fx(X=x) with fx(X=g'(Y1))
+x1.pmf(sqrt(4)) + x1.pmf(-sqrt(4)) == y1.pmf(4)
+
+##############################################################################################
+# Univariant discrete random variable expectation (LNp.5-17)
+##############################################################################################
+x <- data.frame(x=c(0,1,2,3,4), fx=c(5/210, 50/210, 100/210, 50/210, 5/210))
+
+# calculate mean: x * f(x)
+(mean = sum(x$x * x$fx))
+
+# calculate variance: (x-u)^2 * f(x)
+(var = sum( (x$x - mean)^2 * x$fx ))
+
+# calculate moment: x^n * f(x)
+# here, n is set to 2: x^2 * f(x)
+n <- 2
+(mean_of_sqrt = sum((x$x)^n * x$fx))
+
+# variance can be calculated alternative from mean
+# var = E(x^2) - (E(x))^2
+var
+mean_of_sqrt - (mean^2)
+
+# Calculate MSE (Mean Squre Error), given c=3
+c <- 3
+# calculate by creating another random variable t
+x$t <- (x$x - c)^2
+sum(x$t * x$fx)
+# calculate by equation
+bias <- c-mean
+var + bias^2
+
+##############################################################################################
 #
 # Common distribution model:
 #
@@ -39,9 +147,9 @@ library(distr)  # DiscreteDistribution
 #   random:   rbinom(n, size, prob)
 #
 ##############################################################################################
-x <- c(1:10)
-size <- 10
-prob <- 0.5
+x <- c(1:9)
+size <- 9
+prob <- 0.3038
 
 binomi <- data.frame( x=x, pmf=dbinom(x, size, prob), cdf=pbinom(x, size, prob))
 binomi.summary <- ddply(binomi, .(), summarize, mean=sum(x * pmf), variance=sum(pmf * ((x-mean)^2)))
@@ -52,10 +160,16 @@ binomi.summary
 ggplot(binomi, aes(x=x, y=pmf)) + geom_bar(stat="identity")
 ggplot(binomi, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 
+# What is the probability that South gets no Aces on at least k=5 of n=9 hands?
+prob <- 0.3038
+sum(dbinom(c(5:9), 9, prob))
+# Given probability = 0.9, how many trails expected to have Aces at n=9 hands?
+qbinom(0.9, 9, prob)
+
 ##############################################################################################
 # Negative Binomial distribution:
 #
-#   每次成功機率為prob，要求size次成功，總共需要嘗試x次的機率
+#   每次成功機率為prob，要求size次成功，總共需要失敗x次的機率
 #
 #   pmf:      dnbinom(x, size, prob, mu, log = FALSE)
 #   cdf:      pnbinom(q, size, prob, mu, lower.tail = TRUE, log.p = FALSE)
@@ -64,8 +178,8 @@ ggplot(binomi, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 #
 ##############################################################################################
 x <- c(1:25)
-size <- 5
-prob <- 0.5
+size <- 3
+prob <- 1/3
 
 nbinom <- data.frame( x=x, pmf=dnbinom(x, size, prob), cdf=pnbinom(x, size, prob))
 nbinom.summary <- ddply(nbinom, .(), summarize, mean=sum(x * pmf), variance=sum(pmf * ((x-mean)^2)))
@@ -76,10 +190,18 @@ nbinom.summary
 ggplot(nbinom, aes(x=x, y=pmf)) + geom_bar(stat="identity")
 ggplot(nbinom, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 
+# Equivalence of Binomial and Negative binomial (LNp.5-27)
+# Negative binomial: Each time hiring probability is 1/3, the probability of exact 10 trials
+#                    required to hire 3 engineers. (10th trial is the last one for the 3rd
+#                    engineer.)
+# Binomial:          Each time hiring probability is 1/3, the probability of hiring 2 engineers
+#                    in exact 9 trials. Then, times by 1/3.
+dnbinom(7, 3, 1/3)
+dbinom(2, 9, 1/3) / 3
 ##############################################################################################
 # Geometric distribution:
 #
-#   每次成功機率為prob，要求1次成功，總共需要嘗試x次的機率
+#   每次成功機率為prob，要求1次成功，總共需要失敗x次的機率
 #
 #   pmf:      dgeom(x, prob, log = FALSE)
 #   cdf:      pgeom(q, prob, lower.tail = TRUE, log.p = FALSE)
@@ -99,6 +221,10 @@ geom.summary
 ggplot(geom, aes(x=x, y=pmf)) + geom_bar(stat="identity")
 ggplot(geom, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 
+# Equivalence of Negative binomial and Geometric (LNp.5-29)
+# Geometric is a special case of Negative binomial when success number is 1 (size=1)
+dnbinom(9, 1, 1/3)
+dgeom(9, 1/3)
 ##############################################################################################
 # Poisson distribution:
 #
@@ -125,13 +251,19 @@ pois.summary
 ggplot(pois, aes(x=x, y=pmf)) + geom_bar(stat="identity")
 ggplot(pois, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 
-# LNp5-33, the prob of typing error >= 5.
-sum(pois[5:20,]$pmf)
+# A professor hits the wrong key with probability p=0.001 each time he types a letter. Assume
+# independence for the occurrence of errors between different letter typings. What's the
+# probability that 5 or more errors in n=2500 letters. (LNp.5-33)
+1-sum( dpois(c(0:4), 2500 * 0.001) )
+
+# Traffic accident occurs according to a Poisson process at a rate of 5.5 per month.
+#  What is the probability of 3 or more accidents occur in a 2 month periods?
+1-sum(dpois(c(0:2), lambda = 5.5 * 2))
 
 ##############################################################################################
 # Hypergeometric distribution:
 #
-#   盒子中共有m個白球、n個黑球，從盒子中要抽k球，其中x個白球的機率
+#   盒子中共有m個白球、n個黑球，從盒子中要抽k球(抽球後不放回)，其中x個白球的機率
 #
 #   pmf:      dhyper(x, m, n, k, log = FALSE)
 #   cdf:      phyper(q, m, n, k, lower.tail = TRUE, log.p = FALSE)
@@ -175,6 +307,9 @@ ggplot(unif, aes(x=x)) + stat_function(fun=dunif, args=list(min=min, max=max))
 ggplot(unif, aes(x=x)) + geom_area(stat = "function", fun = dunif, args=list(min=min, max=max), fill = "black")
 ggplot(unif, aes(x=x)) + stat_function(fun=punif, args=list(min=min, max=max))
 
+# {TBD} integrate example
+integrand <- function(x){x*punif(x, min, max)}
+integrate(integrand,1, 10)
 ##############################################################################################
 # Exponential distribution:
 #
@@ -464,50 +599,129 @@ persp3d(x, y, joint_pdf, col="blue")
 # plot joint cdf
 persp3d(x, y, joint_cdf, col="blue")
 
+# If two random variables x, y are independent, for any x, the y distribution is identical LNp.7-27
+# This can be proven by observing the following: after normalization, the probability for every y
+# is the same
+joint_pdf[,1] / sum(joint_pdf[,1])
+joint_pdf[,2] / sum(joint_pdf[,2])
+joint_pdf[,3] / sum(joint_pdf[,3])
+joint_pdf[,4] / sum(joint_pdf[,4])
+joint_pdf[,5] / sum(joint_pdf[,5])
+joint_pdf[,6] / sum(joint_pdf[,6])
+joint_pdf[,7] / sum(joint_pdf[,7])
+joint_pdf[,8] / sum(joint_pdf[,8])
+joint_pdf[,9] / sum(joint_pdf[,9])
+joint_pdf[,10] / sum(joint_pdf[,10])
+joint_pdf[,11] / sum(joint_pdf[,11])
+
+# However, this is not easy to understand visually
+joint_pdf_df <- as.data.frame(joint_pdf)
+colnames(joint_pdf_df) <- c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11")
+ggplot(joint_pdf_df, aes(x=c(1:11), y=X1)) + geom_line() + geom_line(aes(y=X2)) + geom_line(aes(y=X3)) + geom_line(aes(y=X11))
+
+
 ##############################################################################################
 # Multinomial distribution:
 #
 ##############################################################################################
 # Generate random number based on multinomial distribution
+# For a basic experiment with 6 outcomes, each with 1/6 probability.
+# For total 10 trials, generate the random outcome based on such multinomial distribution
 trial <- 10
 die_sum <- 6
 die_prob <- c(1/6, 1/6, 1/6, 1/6, 1/6, 1/6)
 rmultinom(trial, size = die_sum, prob = die_prob)
 
-# Given 6 classes, each with 1/6 probability
+# For a basic experiment with 2 outcomes (x1, x2), each with 1/2 probability.
+# For total 3 trials, calculate probability for all outcome combinations.
 #
-data = data.frame()
-for( x1 in c(0:10) ) {
-    for( x2 in c(0:10) ) {
-        point <- c(x1, x2)
-        die_prob <- c(1/2, 1/2)
-        joint_prob <- dmultinom(point, size = NULL, prob = die_prob)
-        data <- rbind(data, data.frame(x1=x1, x2=x2, joint_prob=joint_prob))
-    }
-}
-data
-
-# For a basic experiment with 2 outcomes, each with 1/2 probability.
-# For total 2 trials, calculate probability for all outcome combinations.
-data <- data.frame( x1=c(0, 1, 2), x2=c(2, 1, 0))
+# All possible outcomes are listed as follows:
+#
+#   x1 x2 prob  comment
+#    0  3 0.125 In 3 trials, the probability that, x2 occurs 3 times, is 0.125
+#    1  2 0.375 In 3 trials, the probability that, x1 occurs 1 time and x2 occurs 2 times, is 0.375
+#    2  1 0.375 In 3 trials, the probability that, x1 occurs 2 time and x2 occurs 1 times, is 0.375
+#    3  0 0.125 In 3 trials, the probability that, x1 occurs 3 times, is 0.125
+data <- data.frame( x1=c(0:3), x2=c(3:0))
 data <- ddply(data, .(x1, x2), summarize, joint_prob = dmultinom(c(x1, x2), size = NULL, prob = c(1/2, 1/2)) )
 data
 
-# For a basic experiment with 4 outcomes, each with 1/4 probability.
-# For total 2 trials, calculate probability for all outcome combinations.
-data <- data.frame( x1=c(0, 1, 2), x2=c(2, 1, 0))
-data <- ddply(data, .(x1, x2), summarize, joint_prob = dmultinom(c(x1, x2), size = NULL, prob = c(1/4, 1/4, 1/4, 1/4)) )
-data
-
-
+# Plot the joint pmf
+# The points are only available at diagonal, since x1 + x2 = 3
 ggplot(data, aes(x=x1, y=x2)) + geom_point() + geom_tile(aes(fill=joint_prob))
-ggplot(data, aes(x=x1, y=x2)) + geom_point() + geom_contour(aes(z=joint_prob))
 
-ggplot(data, aes(x=x1, y=x2)) + stat_function(fun=pexp, args=list(rate=rate))
+# This is why such bivariant distribution can be discussed on only 1 variable
+# LNp.7-16
+ggplot(data, aes(x=x1, y=joint_prob)) + geom_point() + geom_line()
 
-x <- c(2, 0)
-die_prob <- c(1/2, 1/2)
-dmultinom(x, size = NULL, prob = die_prob)
+
+# For a basic experiment with 3 outcomes (x1, x2, x3), each with 1/3 probability.
+# For total 3 trials, calculate probability for all outcome combinations.
+#
+# All possible outcomes are listed as follows:
+#
+# The number of all outcomes is 10, which can be calculated by (n+r-1)!/(n-1)!r!
+# The probability of each outcome is a partition problem.
+# For example, p(x1=0, x2=1, x3=1) = ( 3! / 0! * 1! * 1! ) / 27 = 6/27 = 0.22222222
+#
+#   x1 x2 x3 joint_prob number
+#   0  0  3  0.03703704  1
+#   0  1  2  0.11111111  3
+#   0  2  1  0.11111111  3
+#   0  3  0  0.03703704  1
+#   1  0  2  0.11111111  3
+#   1  1  1  0.22222222  6
+#   1  2  0  0.11111111  3
+#   2  0  1  0.11111111  3
+#   2  1  0  0.11111111  3
+#   3  0  0  0.03703704  1
+# SUM        1          27 = (3 x 3 x 3)
+#
+# This is in fact corresponds to (x1+x2+x3)^3
+data <- data.frame( x1=c(0, 0, 0, 0, 1, 1, 1, 2, 2, 3), x2=c(0, 1, 2, 3, 0, 1, 2, 0, 1, 0), x3=c(3, 2, 1, 0, 2, 1, 0, 1, 0, 0))
+data <- ddply(data, .(x1, x2, x3), summarize, joint_prob = dmultinom(c(x1, x2, x3), size = NULL, prob = c(1/3, 1/3, 1/3)) )
+sum(data$joint_prob)
+
+# Plot the joint pmf
+# The points are only available at diagonal, since x1 + x2 = 3
+ggplot(data, aes(x=x1, y=x2)) + geom_point() + geom_tile(aes(fill=joint_prob))
+
+
+##############################################################################################
+# Joint distribution transformation - method of event
+#
+#   For 2 independent Poisson distribution X ~ Poisson(l1) and Y ~ Poisson(l2),
+#   the tranformation of X+Y=Z will be Z ~ Poisson(l1+l2)
+#
+#   每次嘗試的成功機率為prob，在size次嘗試中，成功x次的機率
+#   size很大，size遠大於x，prob很小
+#
+#   pmf:      dpois(x, lambda, log = FALSE)
+#   cdf:      ppois(q, lambda, lower.tail = TRUE, log.p = FALSE)
+#   quantile: qpois(p, lambda, lower.tail = TRUE, log.p = FALSE)
+#   random:   rpois(n, lambda)
+#
+##############################################################################################
+x <- c(1:20)
+l1 <- 5
+x.pois <- data.frame( x=x, pmf=dpois(x, l1), cdf=ppois(x, l1))
+x.pois
+ggplot(x.pois, aes(x=x, y=pmf)) + geom_bar(stat="identity")
+
+y <- c(1:20)
+l2 <- 10
+y.pois <- data.frame( y=y, pmf=dpois(x, l2), cdf=ppois(x, l2))
+y.pois
+ggplot(y.pois, aes(x=x, y=pmf)) + geom_bar(stat="identity")
+
+x.pois
+y.pois
+
+z <- c(1:20)
+l3 <- l1 + l2
+z.pois <- data.frame( z=z, pmf=dpois(x, l3), cdf=ppois(x, l3))
+z.pois
+ggplot(z.pois, aes(x=z, y=pmf)) + geom_bar(stat="identity")
 
 ##############################################################################################
 # Misc:
@@ -532,3 +746,6 @@ qD(seq(0,1,by=0.1))
 # [1] 0 0 0 0 0 0 1 1 2 2 2
 rD(20)
 # [1] 0 0 2 2 1 0 0 1 0 1 0 2 0 0 0 0 1 2 1 0
+
+test <- data.frame(x=c(0:10))
+ggplot(test, aes(x=x)) + stat_function(fun=dD)
