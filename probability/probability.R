@@ -155,7 +155,7 @@ x <- c(1:9)
 size <- 9
 prob <- 0.3038
 
-binomi <- data.frame( x=x, pmf=log(dbinom(x, size, prob)), cdf=pbinom(x, size, prob))
+binomi <- data.frame( x=x, pmf=dbinom(x, size, prob), cdf=pbinom(x, size, prob))
 binomi.summary <- ddply(binomi, .(), summarize, mean=sum(x * pmf), variance=sum(pmf * ((x-mean)^2)))
 
 binomi
@@ -566,7 +566,7 @@ ggplot(beta, aes(x=x)) + stat_function(fun=dbeta, args=list(shape1=6*19, shape2=
 #   random:   rnorm(n, mean = 0, sd = 1)
 #
 ##############################################################################################
-x <- c(0:20)
+x <- c(-10:20)
 mean <- 0
 sd <- 1
 
@@ -580,9 +580,16 @@ mean
 bias_fx <- function(x, mean=0, sd=1){ (x-mean)^2*dnorm(x, mean=mean, sd=sd) }
 (var = integrate(bias_fx, lower=-Inf, upper=Inf))
 
+# The mean of a distribution can be also obtained by cdf (LNp.6-15)
+f <- function(x, mean=0, sd=1){ 1-pnorm(x, mean=mean, sd=sd) }
+area_i <- integrate(f, lower=0, upper=Inf)
+f <- function(x, mean=0, sd=1){ pnorm(x, mean=mean, sd=sd) }
+area_ii <- integrate(f, lower=Inf, upper=0)
+(mean <- area_i$value - area_ii$value)
+
 ggplot(norm, aes(x=x)) + stat_function(fun=dnorm, args=list(mean=mean, sd=sd))
 ggplot(norm, aes(x=x)) + geom_area(stat = "function", fun = dnorm, args=list(mean=mean, sd=sd), fill = "black")
-ggplot(norm, aes(x=x)) + stat_function(fun=pnorm, args=list(mean=mean, sd=sd))
+ggplot(norm, aes(x=x)) + stat_function(fun=pnorm, args=list(mean=0, sd=1))
 
 # LNp6-31, the bell-shaped discussion
 ggplot(norm, aes(x=x)) + stat_function(fun=dnorm, args=list(mean=0, sd=0.5)) + stat_function(fun=dnorm, args=list(mean=0, sd=1), colour="blue") + stat_function(fun=dnorm, args=list(mean=0, sd=2), colour="red")
@@ -599,6 +606,55 @@ ggplot(norm, aes(x=x)) + stat_function(fun=dnorm, args=list(mean=mean, sd=sd)) +
 
 # LNp6-33, standard normal distribution
 ggplot(, aes(x=c(-5:5))) + stat_function(fun=dnorm, args=list(mean=0, sd=1))
+
+##############################################################################################
+# Normal dist and Binomial dist approximation
+#
+##############################################################################################
+# Observe how large n can result in approximation of normal pdf and binomial pmf. (LNp.6-36)
+# Note that approximation via pdf/pmf is in-correct, as pointed out in later example
+data <- data.frame( x=c(0:50))
+ggplot(data, aes(x=x, y=dbinom(x, size=5, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=3.5, sd=1.05^(1/2))) + ylim(0, 0.4)
+ggplot(data, aes(x=x, y=dbinom(x, size=10, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=7, sd=2.1^(1/2))) + ylim(0, 0.4)
+ggplot(data, aes(x=x, y=dbinom(x, size=20, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=14, sd=4.2^(1/2))) + ylim(0, 0.4)
+ggplot(data, aes(x=x, y=dbinom(x, size=50, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=35, sd=10.5^(1/2))) + ylim(0, 0.4)
+
+# An example that approximation via pdf/pmf is in-correct. (LNp.6-37)
+# Assume a transformation of Y applies to both binomial(size=50, prob=0.7) and
+#   normal(mean=35, sd=10.5^(1/2)), with Y=g(x)=X/2 g-1(y)=2Y
+
+# According to LNp.6-8~6-10, the transformed normal's pdf is as follows:
+#  fy(y) = fx(g-1(y)) * |dg-1(y) / dy|
+#  Fy(y) = Fx(g-1(y))     If g is strictly increasing
+g <- function(x) {3*x+2}
+g_inv <- function(y) {2*y}
+norm_fx <- function(x) {dnorm(x, mean=35, sd=10.5^(1/2))}
+norm_fy <- function(y) {norm_fx(g_inv(y))*2}
+norm_Fx <- function(x) {pnorm(x, mean=35, sd=10.5^(1/2))}
+norm_Fy <- function(y) {norm_Fx(g_inv(y))}
+
+# The transformed binomial's pmf is as follows:
+bino_px <- function(x) {dbinom(x, size=50, prob=0.7)}
+bino_py <- function(y) {bino_px(g_inv(y))}
+bino_Fx <- function(x) {pbinom(x, size=50, prob=0.7)}
+bino_Fy <- function(y) {bino_Fx(g_inv(y))}
+
+# Biplot transformed binomail pmf and normal pdf, to observe the difference
+data <- data.frame( x=seq(0,50), by=0.5)
+ggplot(data, aes(x=x, y=bino_py(x))) + geom_bar(stat="identity") + stat_function(fun=norm_fy, color="red")
+
+# Biplot transformed binomail cdf and normal cdf, to observe the difference
+ggplot(data, aes(x=x, y=bino_Fy(x))) + geom_bar(stat="identity") + stat_function(fun=norm_Fy, color="red")
+
+
+# Continuity correction (LNp.6-37~6-38)
+# pmf of binomial(50, 0.4), mean=20, variance=12
+# cdf of normal(20, 12)
+dbinom(18, size=50, prob=0.4)
+pnorm(18.5, mean=20, sd=12^(1/2)) - pnorm(17.5, mean=20, sd=12^(1/2))
+
+sum(dbinom(c(30:100), size=50, prob=0.4))
+1-pnorm(29.5, mean=20, sd=12^(1/2))
 
 ##############################################################################################
 # Weibull distribution:
