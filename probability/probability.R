@@ -155,6 +155,11 @@ x <- c(1:9)
 size <- 9
 prob <- 0.3038
 
+dbinom(0, 9, 0.3038) + dbinom(1, 9, 0.3038)
+pbinom(1, 9, 0.3038)
+qbinom(0.18, 9, 0.3038)
+hist(rbinom(10000, 2, 0.5))
+
 binomi <- data.frame( x=x, pmf=dbinom(x, size, prob), cdf=pbinom(x, size, prob))
 binomi.summary <- ddply(binomi, .(), summarize, mean=sum(x * pmf), variance=sum(pmf * ((x-mean)^2)))
 
@@ -167,6 +172,7 @@ ggplot(binomi, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 # What is the probability that South gets no Aces on at least k=5 of n=9 hands?
 prob <- 0.3038
 sum(dbinom(c(5:9), 9, prob))
+
 # Given probability = 0.9, how many trails expected to have Aces at n=9 hands?
 qbinom(0.9, 9, prob)
 
@@ -201,7 +207,7 @@ ggplot(nbinom, aes(x=x, y=cdf)) + geom_bar(stat="identity")
 # Binomial:          Each time hiring probability is 1/3, the probability of hiring 2 engineers
 #                    in exact 9 trials. Then, times by 1/3.
 dnbinom(7, 3, 1/3)
-dbinom(2, 9, 1/3) / 3
+dbinom(2, 9, 1/3) * (1/3)
 ##############################################################################################
 # Geometric distribution:
 #
@@ -841,6 +847,10 @@ ggplot(joint, aes(x=y)) + stat_function(fun=pexp, args=list(rate=rate))
 # plot joint pdf
 persp3d(x, y, joint_pdf, col="blue")
 
+# Generate random number with such jointly distribution, and visualize with scatter plot
+data <- data.frame(x=rexp(5000, rate), y=rexp(5000, rate))
+ggplot(data, aes(x=x, y=y)) + geom_point()
+
 # plot joint cdf
 persp3d(x, y, joint_cdf, col="blue")
 
@@ -859,11 +869,17 @@ joint_pdf[,9] / sum(joint_pdf[,9])
 joint_pdf[,10] / sum(joint_pdf[,10])
 joint_pdf[,11] / sum(joint_pdf[,11])
 
-# However, this is not easy to understand visually
+# However, this is not easy to understand visually, without log(y)
 joint_pdf_df <- as.data.frame(joint_pdf)
 colnames(joint_pdf_df) <- c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11")
 ggplot(joint_pdf_df, aes(x=c(1:11), y=X1)) + geom_line() + geom_line(aes(y=X2)) + geom_line(aes(y=X3)) + geom_line(aes(y=X11))
+ggplot(joint_pdf_df, aes(x=c(1:11), y=X1)) + geom_line() + geom_line(aes(y=X2)) + geom_line(aes(y=X3)) + geom_line(aes(y=X11)) + scale_y_log10()
 
+
+# Other bivariant jointly distribution
+# I find it interesting to look at
+data <- data.frame(x=rnorm(5000), y=rexp(5000, rate))
+ggplot(data, aes(x=x, y=y)) + geom_point()
 
 ##############################################################################################
 # Multinomial distribution:
@@ -924,6 +940,7 @@ ggplot(data, aes(x=x1, y=joint_prob)) + geom_point() + geom_line()
 #
 # This is in fact corresponds to (x1+x2+x3)^3
 data <- data.frame( x1=c(0, 0, 0, 0, 1, 1, 1, 2, 2, 3), x2=c(0, 1, 2, 3, 0, 1, 2, 0, 1, 0), x3=c(3, 2, 1, 0, 2, 1, 0, 1, 0, 0))
+data
 data <- ddply(data, .(x1, x2, x3), summarize, joint_prob = dmultinom(c(x1, x2, x3), size = NULL, prob = c(1/3, 1/3, 1/3)) )
 sum(data$joint_prob)
 
@@ -931,6 +948,9 @@ sum(data$joint_prob)
 # The points are only available at diagonal, since x1 + x2 = 3
 ggplot(data, aes(x=x1, y=x2)) + geom_point() + geom_tile(aes(fill=joint_prob))
 
+# If a balanced (6-slided) die is rolled 12 times, what's the probability that each face
+# appears twice?
+dmultinom(c(2, 2, 2, 2, 2, 2), size = NULL, prob = c(1/6, 1/6, 1/6, 1/6, 1/6, 1/6))
 
 ##############################################################################################
 # Joint distribution transformation - method of event
@@ -938,22 +958,14 @@ ggplot(data, aes(x=x1, y=x2)) + geom_point() + geom_tile(aes(fill=joint_prob))
 #   For 2 independent Poisson distribution X ~ Poisson(l1) and Y ~ Poisson(l2),
 #   the tranformation of X+Y=Z will be Z ~ Poisson(l1+l2)
 #
-#   每次嘗試的成功機率為prob，在size次嘗試中，成功x次的機率
-#   size很大，size遠大於x，prob很小
-#
-#   pmf:      dpois(x, lambda, log = FALSE)
-#   cdf:      ppois(q, lambda, lower.tail = TRUE, log.p = FALSE)
-#   quantile: qpois(p, lambda, lower.tail = TRUE, log.p = FALSE)
-#   random:   rpois(n, lambda)
-#
 ##############################################################################################
-x <- c(1:20)
+x <- c(-5:20)
 l1 <- 5
 x.pois <- data.frame( x=x, pmf=dpois(x, l1), cdf=ppois(x, l1))
 x.pois
 ggplot(x.pois, aes(x=x, y=pmf)) + geom_bar(stat="identity")
 
-y <- c(1:20)
+y <- c(-5:20)
 l2 <- 10
 y.pois <- data.frame( y=y, pmf=dpois(x, l2), cdf=ppois(x, l2))
 y.pois
@@ -962,35 +974,89 @@ ggplot(y.pois, aes(x=x, y=pmf)) + geom_bar(stat="identity")
 x.pois
 y.pois
 
-z <- c(1:20)
+z <- c(-5:20)
 l3 <- l1 + l2
 z.pois <- data.frame( z=z, pmf=dpois(x, l3), cdf=ppois(x, l3))
 z.pois
 ggplot(z.pois, aes(x=z, y=pmf)) + geom_bar(stat="identity")
 
+# convolution of Poisson as an example
+dpois(0, l1) * dpois(4, l2) +
+    dpois(1, l1) * dpois(3, l2) +
+    dpois(2, l1) * dpois(2, l2) +
+    dpois(3, l1) * dpois(1, l2) +
+    dpois(4, l1) * dpois(0, l2)
+
+dpois(4, l3)
+
 ##############################################################################################
-# Misc:
+# Order Statistics
 #
-#   Create customized discrete distribution function
-#
+# Practice with X(1) and X(n).
+# Other jointly distribution is skipped.
 ##############################################################################################
-# Define full suite of functions (d*, p*, q*, r*) for your distribution
-D <- DiscreteDistribution (supp = c(0, 1, 2) , prob = c(0.5, .25, .25))
+# Given two random variables following i.i.d
+fx1 <- function(x1) {dexp(x1, rate=0.5)}
+Fx1 <- function(x1) {pexp(x1, rate=0.5)}
+fx2 <- function(x2) {dexp(x2, rate=0.5)}
+Fx2 <- function(x2) {pexp(x2, rate=0.5)}
 
-dD <- d(D)  ## Density function
-pD <- p(D)  ## Distribution function
-qD <- q(D)  ## Quantile function
-rD <- r(D)  ## Random number generation
+# 1. According to theorem, cdf X(1)=1-[1-F(x)]^n pdf X(1)=nf(x)[1-F(x)]^(n-1)
+fmin <- function(x, n=2) {n*dexp(x, rate=0.5) * (1-pexp(x, rate=0.5))^(n-1)}
+Fmin <- function(x, n=2) {1-(1-pexp(x, rate=0.5))^n}
 
-# Take them for a spin
-dD(-1:3)
-# [1] 0.00 0.50 0.25 0.25 0.00
-pD(-1:3)
-# [1] 0.00 0.50 0.75 1.00 1.00
-qD(seq(0,1,by=0.1))
-# [1] 0 0 0 0 0 0 1 1 2 2 2
-rD(20)
-# [1] 0 0 2 2 1 0 0 1 0 1 0 2 0 0 0 0 1 2 1 0
+# Calculate the probability of min <= 3
+# One can use the derived function directly
+Fmin(3)
+# Or, conduct by reasoning
+1-((1-Fx1(3)) * (1 - Fx2(3)))
 
-test <- data.frame(x=c(0:10))
-ggplot(test, aes(x=x)) + stat_function(fun=dD)
+# 2. According to theorem, cdf X(n)=[F(x)]^n pdf X(n)=nf(x)[F(x)]^(n-1)
+fmax <- function(x, n=2) {n*dexp(x, rate=0.5) * (pexp(x, rate=0.5))^(n-1)}
+Fmax <- function(x, n=2) {pexp(x, rate=0.5)^n}
+
+# Calculate the probability of max <= 3
+# One can use the derived function directly
+Fmax(3)
+# Or, conduct by reasoning
+Fx1(3)*Fx2(3)
+
+# LNp.7-47 example
+# n light bulbs are placed in service at time t=0, and allowed to burn continuously. Denote
+# their lifetime by X1,...,Xn, and suppose that they are i.i.d. with cdf F. If burned out
+# bulbs are not replaced, then the probability that the room is still lighted after two
+# month is?
+fmax <- function(x, n=5) {n*dexp(x, rate=1) * (pexp(x, rate=1))^(n-1)}
+Fmax <- function(x, n=5) {pexp(x, rate=1)^n}
+1-Fmax(2)
+
+##############################################################################################
+# Conditional distribution LNp.7-55
+##############################################################################################
+# The joint pdf of x, y is as follows, given ( 0 <= x,y < Inf )
+fxy <- function(x, y) {
+    sapply(x, function(z, y) {
+        2/((1+z+y)^3)
+        }, y=y)
+}
+
+# The marginal pdf of x is obtained from integrate y part of fxy
+# One can verify if fx equals to 1/(1+x)^2
+fx <- function(x) {
+    sapply(x, function(y) integrate(fxy, lower=0, upper=Inf, y=y)$val)
+}
+
+fx(10)
+1/(1+10)^2
+
+# Integrate fx again, to prove the total prob of fxy is 1.
+integrate(fx, 0, Inf)
+
+# The conditional prob fy|x is fxy/fx
+# One can verify if this equals to 2(1+x)^2 / (1+x+y)^3
+fy_x <- function(x,y) {
+    fxy(x, y) / fx(x)
+}
+
+fy_x(1,1)
+2*(1+1)^2 / (1+1+1)^3
