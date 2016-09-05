@@ -1,3 +1,5 @@
+library(ggplot2)
+
 ##############################################################################################
 # Sample mean/variance (LNp.1-6-82,96)
 ##############################################################################################
@@ -56,15 +58,3 @@ ggplot(data, aes(x=x, y=dbinom(x, size=5, prob=0.7))) + geom_bar(stat="identity"
 ggplot(data, aes(x=x, y=dbinom(x, size=10, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=7, sd=2.1^(1/2))) + ylim(0, 0.4)
 ggplot(data, aes(x=x, y=dbinom(x, size=20, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=14, sd=4.2^(1/2))) + ylim(0, 0.4)
 ggplot(data, aes(x=x, y=dbinom(x, size=50, prob=0.7))) + geom_bar(stat="identity") + stat_function(fun=dnorm, args=list(mean=35, sd=10.5^(1/2))) + ylim(0, 0.4)
-
-
-##############################################################################################
-# Method of moments LNp.8-8
-##############################################################################################
-x <- c(31, 29, 19, 18, 31, 28, 34, 27, 34, 30, 16, 18, 26, 27, 27, 18, 24, 22, 28, 24, 21, 17, 24)
-lambda <- mean(x)
-
-hist(x)
-plot(dpois(c(1:50), lambda=lambda))
-factor(x)
-data.frame(x=x,
