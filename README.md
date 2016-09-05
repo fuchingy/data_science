@@ -11,7 +11,19 @@
 
   So far, the examples covers:
 
-     o NTHU Probability course (on-going)
+     o NTHU Probability course
+        - 02 Combinatorial Analysis
+        - 03 Axioms of Probability
+        - 04 Conditional Probability, Bayes' Rule, and Independent
+        - 05 Discrete Random Variables
+        - 06 Continuous Random Variables
+        - 07 Jointly Distributed Random Variables
+        - 08 Properties of Expectation
+     o NTHU Statistics course
+        - 02 Probability
+        - 03 Point Estimation (On-going)
+        - 04 Interval Estimation (TBD)
+        - 05 Hypotheses Testing (TBD)
 
   Documentation
   -------------
@@ -22,8 +34,7 @@
   ------------
 
   No installation is required.
-  The R examples are developed in RStudio. Once RStudio is installed, one
-  can just open *.Rproj with RStudio.
+  Examples are written in R scripts, by Lecture Note sections.
 
   Licensing
   ---------
