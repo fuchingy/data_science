@@ -1,3 +1,7 @@
+library(ggplot2)
+library(stats4) # for mle
+library(numDeriv) # For grad
+
 ##############################################################################################
 # Method of finding estimators I - method of moments
 #
@@ -131,13 +135,122 @@ hist(sim_alpha)
 
 ##############################################################################################
 # Method of finding estimators II - Maximum Likelihood Estimator (MLE)
-#   - ?
 #
-# LNp.8-16
-# Suppose that X1, ..., Xn are i.i.d. ~ P(lambda).
-#                            _
+# Use the sample Poisson example in LNp.8-8 to demo:
+# Suppose that X1, ..., Xn are i.i.d. ~ Poisson(lambda).
+#
+# Instead of conducting mathmetical deduction, R mle()/mle() function is used instead.
+# The log likelihood function is used here.
 ##############################################################################################
-dbinom(7, 10, 0.1)
-dbinom(7, 10, 0.5)
-dbinom(7, 10, 0.7)
-dbinom(7, 10, 0.9)
+x <- c(31, 29, 19, 18, 31, 28, 34, 27, 34, 30, 16, 18, 26, 27, 27, 18, 24, 22, 28, 24, 21, 17, 24)
+hist(x)
+
+# Use mle()
+LL <- function(lambda) {
+    R = dpois(x, lambda)
+    -sum(log(R))
+}
+mle(LL, start = list(lambda = 10))
+
+# Use nlm()
+LL <- function(lambda, x) {
+    sum(-dpois(x, lambda, log = TRUE))
+}
+out <- nlm(LL, 10, x, hessian = TRUE) # Trun on hessian for Fisher information
+out$estimate
+
+# {TBD}
+(fish <- out$hessian)
+solve(fish)
+
+##############################################################################################
+# Asymptotic theory for method of MLE
+#
+# Use the sample Poisson example in LNp.8-8 to demo:
+# Suppose that X1, ..., Xn are i.i.d. ~ Poisson(lambda).
+#
+##############################################################################################
+x <- c(31, 29, 19, 18, 31, 28, 34, 27, 34, 30, 16, 18, 26, 27, 27, 18, 24, 22, 28, 24, 21, 17, 24)
+
+# The log likelihood function for 1 random variable
+LL_1 <- function(x, lambda) {
+    dpois(x, lambda, log = TRUE)
+}
+
+# Observe how log likelihood function varies with different parameters, given different data
+# Same figure in LNp.8-33.
+lambda <- c(0:90)
+data <- data.frame(lambda=lambda, prob=LL_1(31, lambda))
+p <- ggplot(data, aes(x=lambda, y=prob)) + geom_line(colour="blue")
+
+data <- data.frame(lambda=lambda, prob=LL_1(29, lambda))
+p <- p + geom_line(data=data, aes(x=lambda, y=prob), colour="green")
+
+data <- data.frame(lambda=lambda, prob=LL_1(19, lambda))
+p <- p + geom_line(data=data, aes(x=lambda, y=prob), colour="purple")
+
+data <- data.frame(lambda=lambda, prob=LL_1(18, lambda))
+p <- p + geom_line(data=data, aes(x=lambda, y=prob), colour="yellow")
+
+data <- data.frame(lambda=lambda, prob=LL_1(28, lambda))
+p <- p + geom_line(data=data, aes(x=lambda, y=prob), colour="orange") + stat_function(fun=LL_joint)
+p
+
+##############################################################################################
+# Insect counts data, Bliss and Fisher (1953) LNp.67
+#
+# Use the sample Poisson example in LNp.8-8 to demo:
+# Suppose that X1, ..., Xn are i.i.d. ~ Poisson(lambda).
+#
+##############################################################################################
+# Create the sample data
+data <- data.frame(bug_per_leaf=c(0:8), obs_cnt=c(70, 38, 17, 10, 9, 3, 2, 1, 0))
+data$prob <- data$obs_cnt / sum(data$obs_cnt)
+data
+
+# Histgram
+ggplot(data, aes(x=bug_per_leaf, y=obs_cnt)) + geom_bar(stat="identity")
+ggplot(data, aes(x=bug_per_leaf, y=prob)) + geom_bar(stat="identity")
+
+# Fit Poisson statistical model
+# The lambda estimator is sample mean
+(sample_mean <- sum(data$bug_per_leaf * data$prob))
+# Create estimation data following fitted Poisson model
+data$pois_eta_cnt <- 150 * dpois(data$bug_per_leaf, lambda=sample_mean)
+
+# Observe how good Poisson fit
+ggplot(data, aes(x=bug_per_leaf, y=obs_cnt)) + geom_bar(stat="identity") + geom_line(aes(y=pois_eta_cnt), colour="blue")
+
+# Fit Generalized Negative Binomial (GNB) statistical model
+# Since I can't find built-in GNB model, I create a function as its pmf
+dgnb <- function(x, m, k) {
+    ((1+m/k)^(-k)) * (gamma(k+x)/factorial(x)/gamma(k)) * (m/(m+k))^x
+}
+
+# MLE is choosen as the estimators of m and k.
+# The joint log likelihood function is created.
+#   Since the joint log likelihood function needs observation data, instead of
+# frequency, I recreate the observation data as x.
+x <- NULL
+for( row_i in c(1:nrow(data)) ) {
+    x <- c(x, rep(data[row_i,]$bug_per_leaf, data[row_i,]$obs_cnt))
+}
+x
+
+# Create joint log likelihood function
+LL <- function(m, k) {
+    R = dgnb(x, m, k)
+    -sum(log(R))
+}
+
+# Use mle() to estimate m and k
+mle(LL, start = list(m = 10, k = 10))
+
+# Create estimation data following fitted Generalized Negative Binomial model
+data$gnb_eta_cnt <- 150 * dgnb(data$bug_per_leaf, m=1.14881, k=1.024593)
+data
+
+# Observe how good Poisson and GNB fit
+ggplot(data, aes(x=bug_per_leaf, y=obs_cnt)) + geom_bar(stat="identity") +
+    geom_line(aes(y=pois_eta_cnt), colour="blue") +
+    geom_line(aes(y=gnb_eta_cnt), colour="red")
