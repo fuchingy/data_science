@@ -21,9 +21,9 @@
         - 08 Properties of Expectation
      o NTHU Statistics course
         - 02 Probability
-        - 03 Point Estimation (On-going)
-        - 04 Interval Estimation (TBD)
-        - 05 Hypotheses Testing (TBD)
+        - 03 Point Estimation
+        - 04 Interval Estimation
+        - 05 Hypotheses Testing (on-going)
 
   Documentation
   -------------
