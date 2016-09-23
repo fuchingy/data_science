@@ -64,3 +64,143 @@ x <- rnorm(n, mean=90, sd=12)
 # Comparing with the mean estimate and its standard error
 mean(x)
 sqrt(var(x)/n)
+
+##############################################################################################
+# Interval estimation method II - Asymptotic approach
+# Asymptotic pivotal quantative
+#
+# Use the sample Poisson example in LNp.8-8 to demo:
+# Suppose that X1, ..., Xn are i.i.d. ~ Poisson(lambda).
+#
+# Instead of conducting mathmetical deduction, R nlm() function is used.
+# The log likelihood function is used here.
+##############################################################################################
+x <- c(31, 29, 19, 18, 31, 28, 34, 27, 34, 30, 16, 18, 26, 27, 27, 18, 24, 22, 28, 24, 21, 17, 24)
+hist(x)
+
+# Use nlm()
+LL <- function(lambda, x) {
+    sum(-dpois(x, lambda, log = TRUE))
+}
+out <- nlm(LL, 10, x, hessian = TRUE) # Trun on hessian for Fisher information
+out$estimate
+
+# For get the quantile for 0.05 of N(0,1) distribution
+(z <- qnorm(0.975))
+
+# The asymptotic 100(1-a)% confidence interval for theta is
+# estimated_theta +- z / sqrt(n * Fisher_info)
+# Using nlm(), hessian is the Fisher information of n observation data
+(fish <- out$hessian[1])
+
+(lower_bound <- out$estimate - z / sqrt(fish))
+(upper_bound <- out$estimate + z / sqrt(fish))
+
+##############################################################################################
+# Interval estimation method III - Bootstrap approach
+#
+# Use the example in LNp.8-89 to demo:
+# (X1, X2, X3) ~ multinomial(n, p1, p2, p3)
+#              ~ multinomial(n, (1-the)^2, 2the(1-the), the^2)
+##############################################################################################
+# Estimator of theta (LNp.8-24)
+estimator_theta <- function (x2, x3, n) {
+    (2 * x3 + x2) / (2*n)
+}
+
+# Estimate of theta
+(estimated_theta <- 0.4247)
+
+# Generate random theta to know the distribution.
+# Step1: Pretend the estimated one is the real theta
+# Step2: Generate random number using the estimated theta
+# Step3: Calculate simulated theta
+(p1 <- (1-estimated_theta)^2)
+(p2 <- 2 * estimated_theta * (1-estimated_theta))
+(p3 <- estimated_theta^2)
+randx <- rmultinom(1000, 1029, c(p1, p2, p3))
+(eta_theta <- sqrt(randx[3,]/1029))
+
+# Plot the simulated theta and calculate the quantile
+hist(eta_theta)
+sd(eta_theta)
+quantile(eta_theta, 0.025)
+quantile(eta_theta, 0.975)
+
+# Calculate and plot the delta
+delta <- eta_theta - estimated_theta
+hist(delta)
+
+# The simulated 100(1-a)% confidence interval for theta is
+# estimated_theta - delta_975 <= theta <= estimated_theta - delta_025
+quantile(delta, 0.025)
+quantile(delta, 0.975)
+
+(lower_bound <- estimated_theta - quantile(delta, 0.975))
+(upper_bound <- estimated_theta - quantile(delta, 0.025))
+
+
+
+##############################################################################################
+# Interval estimation method III - Bootstrap approach
+#
+# Use the example in LNp.8-89 to demo. (Also LNp.8-13, LNp.8-28)
+##############################################################################################
+# Assume already has estimate using MLE (LNp.8-28)
+lambda <- 1.96
+alpha <- 0.441
+
+# Generate random alpha to know the distribution.
+# Step1: Pretend the estimated alpha and lambda are the real theta
+# Step2: Generate random number using the estimated theta
+# Step3: Calculate simulated theta
+sim_lambda <- NULL
+sim_alpha <- NULL
+for( i in c(1:1000) ) {
+    (sim_x <- rgamma(227, shape=alpha, rate=lambda))
+    (sim_mean <- mean(sim_x))
+    (sim_var <- mean(sim_x^2 - sim_mean^2))
+    sim_lambda <- c(sim_lambda, sim_mean / sim_var)
+    sim_alpha <- c(sim_alpha, (sim_mean^2) / sim_var)
+}
+
+# Plot the simulated alpha and calculate the quantile
+hist(sim_alpha)
+sd(sim_alpha)
+quantile(sim_alpha, 0.05)
+quantile(sim_alpha, 0.95)
+
+# Calculate and plot the delta
+delta <- sim_alpha - alpha
+hist(delta)
+
+# The simulated 100(1-a)% confidence interval for alpha is
+# estimated_alpha - delta_95 <= theta <= estimated_alpha - delta_05
+quantile(delta, 0.05)
+quantile(delta, 0.95)
+
+(lower_bound <- alpha - quantile(delta, 0.95))
+(upper_bound <- alpha - quantile(delta, 0.05))
+
+
+
+# Plot the simulated lambda and calculate the quantile
+hist(sim_lambda)
+sd(sim_lambda)
+quantile(sim_lambda, 0.05)
+quantile(sim_lambda, 0.95)
+
+# Calculate and plot the lambda
+delta <- sim_lambda - lambda
+hist(delta)
+
+# The simulated 100(1-a)% confidence interval for lambda is
+# estimated_lambda - delta_95 <= theta <= estimated_lambda - delta_05
+quantile(delta, 0.05)
+quantile(delta, 0.95)
+
+(lower_bound <- lambda - quantile(delta, 0.95))
+(upper_bound <- lambda - quantile(delta, 0.05))
+
+
+

@@ -108,6 +108,13 @@ second_sample_moment <- 0.183976
 #
 # Continue with the previous example.
 ##############################################################################################
+# Using moment estimator (LNp.8-13)
+lambda <- 1.674141
+alpha <- 0.3750075
+
+# Or, using MLE (LNp.8-28)
+lambda <- 1.96
+alpha <- 0.441
 
 # 2. Simulation method
 # Use random number generator to generate sampling distribution.
@@ -139,7 +146,7 @@ hist(sim_alpha)
 # Use the sample Poisson example in LNp.8-8 to demo:
 # Suppose that X1, ..., Xn are i.i.d. ~ Poisson(lambda).
 #
-# Instead of conducting mathmetical deduction, R mle()/mle() function is used instead.
+# Instead of conducting mathmetical deduction, R mle()/nlm() function is used.
 # The log likelihood function is used here.
 ##############################################################################################
 x <- c(31, 29, 19, 18, 31, 28, 34, 27, 34, 30, 16, 18, 26, 27, 27, 18, 24, 22, 28, 24, 21, 17, 24)
@@ -159,9 +166,8 @@ LL <- function(lambda, x) {
 out <- nlm(LL, 10, x, hessian = TRUE) # Trun on hessian for Fisher information
 out$estimate
 
-# {TBD}
+# Using nlm(), hessian is the Fisher information of n observation data
 (fish <- out$hessian)
-solve(fish)
 
 ##############################################################################################
 # Asymptotic theory for method of MLE
