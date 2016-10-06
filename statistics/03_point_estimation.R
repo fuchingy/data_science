@@ -1,6 +1,7 @@
 library(ggplot2)
 library(stats4) # for mle
-library(numDeriv) # For grad
+library(numDeriv) # for grad
+library(MASS) # for fitdistr
 
 ##############################################################################################
 # Method of finding estimators I - method of moments
@@ -148,6 +149,27 @@ hist(sim_alpha)
 #
 # Instead of conducting mathmetical deduction, R mle()/nlm() function is used.
 # The log likelihood function is used here.
+#
+# Alternative approach is fitdistr(), which fit data to common distributions, including
+#
+# Distribution        Start value requirement
+# beta              : ?
+# cauchy            : Auto computed
+# chi-squared       : ?
+# exponential       : No start value
+# f                 : ?
+# gamma             : Auto computed
+# geometric         : No start value
+# log-normal        : ?
+# lognormal         : No start value
+# logistic          : Auto computed
+# negative binomial : Auto computed
+# normal            : No start value
+# Poisson           : No start value
+# t                 : Auto computed
+# weibull           : Auto computed
+#
+# For the Normal, log-Normal, geometric, exponential and Poisson distributions the closed-form MLEs (and exact standard errors) are used, and start should not be supplied.
 ##############################################################################################
 x <- c(31, 29, 19, 18, 31, 28, 34, 27, 34, 30, 16, 18, 26, 27, 27, 18, 24, 22, 28, 24, 21, 17, 24)
 hist(x)
@@ -165,6 +187,9 @@ LL <- function(lambda, x) {
 }
 out <- nlm(LL, 10, x, hessian = TRUE) # Trun on hessian for Fisher information
 out$estimate
+
+# Use fitdistr()
+fitdistr(x, "Poisson")
 
 # Using nlm(), hessian is the Fisher information of n observation data
 (fish <- out$hessian)
