@@ -1,0 +1,128 @@
+---
+title: "Statistical Inference Course Project - Part 1"
+author: "Fu-Ching Yang"
+date: "Monday, October 03, 2016"
+output: pdf_document
+---
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2)
+require(gridExtra)
+set.seed(123)
+```
+
+# Overview
+
+In this project, I'll show how to do statistical inference using exponential distribution as an example. First, I'll illustrate the exponential distribution. Second, I'll show how to approximate the population mean and variance (standard deviation). Then, I compare the exponential distribution with the Central Limit Theorem. Finally, I show how to evaluate confidence interval and perform hypothesis test.
+
+# Simulations
+
+We assume the population is the exponential distribution with lambda = 0.2.
+
+The mean and standard deviation of exponential distribution is 1/lambda, which is 5 in this case.
+
+To visualize the exponential distribution, we plot the histogram of 1000 random number generated from exponential distribution and also the pmf (probability mass function).
+
+The mean is at 5, indicated by the blue line.
+
+```{r, echo=FALSE}
+data <- data.frame(x=rexp(1000, rate=0.2))
+mean <- mean(data$x)
+p_rand <- ggplot(data, aes(x=x)) +
+    geom_histogram(binwidth=1) +
+    geom_vline(xintercept = mean, colour="blue") +
+    ggtitle("Random samples of exponential \ndistribution")
+p_pmf <- ggplot(data.frame(x=c(0:35)), aes(x=x, y=dexp(x, rate=0.2))) +
+    geom_bar(stat="identity") +
+    geom_vline(xintercept = 5, colour="blue") +
+    ggtitle("pmf of exponential distribution")
+grid.arrange(p_rand, p_pmf, ncol=2)
+```
+
+Now, assume 40 samples are collected from such distribution, and the sample mean is calculated.
+We can do this 1000 times to observe the distribution of sample mean. Following is the plot of the sample mean distribution.
+
+```{r, echo=FALSE}
+mns = NULL
+for (i in 1 : 1000) mns = c(mns, mean(rexp(n=40, rate=0.2)))
+p_sam_dist <- ggplot(data.frame(x=mns), aes(x=x)) +
+    geom_histogram(aes(y=..density..), binwidth=0.1) +
+    geom_density(colour="red") +
+    stat_function(fun=dnorm, args=list(mean=5, sd=5/sqrt(40)), colour="green") +
+    geom_vline(xintercept = mean(mns), colour="blue") +
+    ggtitle("Distribution of sample mean")
+p_sam_dist
+```
+
+# Sample Mean versus Theoretical Mean
+
+By comparing the original exponential distribution and the sample mean distribution, you can see they are quite different. However, the sample mean approximates the theoretical mean.
+
+From the sample mean distribution figure, although the sample mean varies, it shows up highest frequently at around 5 (blue line), which is very closed to the theoretical mean 5 (1/0.2).
+
+```{r}
+mean(mns)
+```
+
+# Sample Variance versus Theoretical Variance
+
+The theoretical variance can also be approximated by the sample variance. So does the standard deviation.
+
+To prove it, we collect 1000 sample standard deviation, each from a sample size 40. The average of these 1000 standard deviations is centered at around 5, which is very closed to the theoretical standard deviation (5=1/0.2).
+
+```{r}
+sds = NULL
+for (i in 1 : 1000) sds = c(sds, sd(rexp(n=40, rate=0.2)))
+mean(sds)
+```
+
+
+```{r, echo=FALSE}
+#p_sam_sds <- ggplot(data.frame(x=sds), aes(x=x)) +
+#    geom_histogram(binwidth=0.1) +
+#    geom_vline(xintercept = mean(sds), colour="blue") +
+#    ggtitle("Distribution of sampled standard deviation")
+#p_sam_sds
+```
+
+
+# Distribution
+
+According to CLT, the sample mean's distribution will be like Normal distribution. In the sample mean distribution that we have shown, we also plot the its density distribution in red curve. As we can see, it is approximately Normal. In fact, what it approximates is exactly (mean, sd/sqrt(n)), which is the green curve.
+
+As you can see, they are very much alike.
+
+# Hypothesis testing
+
+Given the sample mean and sample variance, we can perform hypothesis testing. Since we aleady knew the sample mean distribution approxmiates Normal(mean, sd/sqrt(n)), we can calculate the two-sided 95% confidence interval, with the estimated sample mean and sample variance. I use the R qnorm() function to do this for me. The 95% confidence interval is between 3.503459 and 6.522466
+
+```{r}
+conf_int <- qnorm(c(0.025, 0.975), mean=mean(mns), sd=mean(sds)/sqrt(40))
+conf_int
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# To illustrate the concept, in the following sampling distribution, the red part is the two-sided 95% confidence interval.
+#data <- data.frame(x=seq(1, 10, 0.01), y=dnorm(seq(1, 10, 0.01), mean=mean(mns), sd=mean(sds)/sqrt(40)))
+#ggplot(data, aes(x=x, y=y)) +
+#    geom_line() + 
+#    geom_area(mapping = aes(x = ifelse(x>conf_int[1] & x<conf_int[2] , x, 0)), fill = "red") +
+#    xlim(1, 10) +
+#    ggtitle("Sampling distribution of the sample mean\n95% confidence interval")
+```
+
+With such distribution, we can answer questions like: is the mean greater than 5, given alpha=5% in one-sided test.
+
+The null hypothesis: mean = 5
+The alternative hypothesis: mean > 5
+
+Let's use cdf of the sampling distribution to calculate the probability greater than 5. This probability is exact p-Value.
+
+The result shows p-Value is 49%, which is far bigger than the 5% alpha we specified. Therefore, we fail to reject the hypothesis that mean is equal to 5. In other words, the mean equals to 5, given 5% type-I error rate.
+
+```{r}
+pvalue <- 1-pnorm(mean(mns), mean=5, sd=mean(sds)/sqrt(40))
+pvalue
+```
+
+
