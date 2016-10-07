@@ -172,8 +172,8 @@ results <- chisq.test(obs, p=exp, rescale.p=TRUE, simulate.p.value=TRUE)
 # The statistics (0.0319) is smaller than 3.84 (95%-quantile), thus accept H0
 results$statistic
 
-# p-Value is 0.985, which is very hard to reject H0
-results$p.value
+# p-Value is 0.86, which is very hard to reject H0
+pchisq(results$statistic, df=1, lower.tail=FALSE)
 
 ##############################################################################################
 # Fisher's reexamination of Mendel's data (LNp.9-45)
@@ -195,5 +195,5 @@ results <- chisq.test(obs, p=exp, rescale.p=TRUE, simulate.p.value=TRUE)
 # The Peason's statistics (0.604) is smaller than 7.81 (95%-quantile), thus accept H0
 results$statistic
 
-# p-Value is 0.903, which is very hard to reject H0
-results$p.value
+# p-Value is 0.895, which is very hard to reject H0
+pchisq(results$statistic, df=3, lower.tail=FALSE)
