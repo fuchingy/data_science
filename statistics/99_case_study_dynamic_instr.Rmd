@@ -1,0 +1,154 @@
+---
+title: 'Case study: Dynamic Instruction Distribution'
+author: "Fu-Ching Yang"
+date: "Thursday, October 06, 2016"
+output: html_document
+---
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2) # for ggplot
+library(MASS)    # for fitdistr
+```
+
+# Introduction
+
+After finishing the NTHU Statistics course, I'm ready to apply this on the instruction execution frequency problem.
+
+First, load the partial PC trace file of pattern-40766.
+
+```{r}
+data <- read.table("40766_pc_trace_partial.log", header = FALSE, sep = ",")
+colnames(data) <- "pc"
+```
+
+# Data Summary
+
+There are 10,000 dynamic instructions in this trace.
+
+```{r}
+str(data)
+```
+
+I wonder how the execution amount of instructions varies. Histogram shows that the execution amount is contributed by only a few instructions.
+
+You can see the bars are sparse, since x-axis is the instruction identity (PC).
+
+```{r}
+hist(data$pc, breaks=100)
+```
+
+Let's ignore the instruction identity (PC) and sort the execution amount in decreasing order.
+
+table() calculates the execution amount per PC.
+
+```{r}
+tb <- table(data$pc)
+head(tb)
+```
+
+Then, we only retrieve the execution amount (ignore PC), and assign it with serial numbers (instr_sn) just for plotting reason. The results are kept in exe_dist (execution amount distribution).
+
+You can see this instr_sn as order statistics X(0), X(1), ..., X(n).
+
+```{r}
+exe_amount <- sort(as.vector(tb), decreasing=TRUE)
+head(exe_amount, n=50)
+exe_dist <- data.frame(instr_sn=c(1:length(exe_amount)), exe_amount=exe_amount)
+head(exe_dist)
+```
+
+Then, we plot the execution amount distribution, as follows. It is very clear that, the execution amount is extremely contributed by only a few instructions.
+
+```{r}
+ggplot(exe_dist, aes(x=instr_sn, y=exe_amount)) + geom_line()
+```
+
+# Statistical modeling & estimation
+
+From the execution distribution plot, since it looks like Exponential distribution, I use this as the statistical modeling.
+
+Using fitdistr() to perform MLE as the point estimation, we can have the lambda estimate 0.1966581. The standard error is 0.003562512.
+
+```{r}
+fit <- fitdistr(exe_amount, "geometric")
+fit$estimate
+fit$sd
+```
+
+# Goodness of fit
+
+To see how closely Exponential fits, I bi-plot the original execution amount distribution (black) and the Exponential distribution (red).
+
+Unfortunately, they are not alike.
+
+```{r}
+ggplot(exe_dist, aes(x=instr_sn, y=exe_amount)) + geom_line() + geom_line(aes(y=length(exe_amount)*dexp(instr_sn, rate=fit$estimate)), color="red")
+```
+
+Let's use chi-square test to see exactly what numbers tell.
+
+H0: Execution amount distribution is the Exponential distribution with lambda 0.1966581. (dim=0)
+HA: Execution amount distribution is the Exponential distribution with other lambda. (dim=1)
+
+Unfortunately, the p-value is 0, I need to reject the hypothesis that execution amount distribution follows Exponential distribution given the estimated lambda. Since the estimated lambda is the best I got, I believe Exponential distribution might not be the good distribution for execution amount distribution.
+
+```{r}
+results <- chisq.test(exe_amount, p=dexp(exe_dist$instr_sn, rate=fit$estimate), rescale.p=TRUE, simulate.p.value=TRUE)
+results$statistic
+pchisq(results$statistic, df=1, lower.tail=FALSE)
+```
+
+Even if I reduce the segment number, the goodness of fit does not improve. (Not sure if this is a reasonable move)
+
+```{r}
+rediv <- tapply(exe_amount,cut(1:length(exe_amount),100),FUN=sum)
+results <- chisq.test(rediv, p=dexp(c(1:100), rate=fit$estimate), rescale.p=TRUE, simulate.p.value=TRUE)
+results$statistic
+pchisq(results$statistic, df=1, lower.tail=FALSE)
+#hist(rediv)
+#hist(length(exe_amount) * dexp(c(1:100), rate=fit$estimate))
+```
+
+I also try other common distribution, but no luck.
+
+# Hypothesis testing
+
+Since the goodness of fit fails, there is no reason to use Exponential distribution to perform futher investigation on the data. However, to make this statistical inference complete, I pretend the Exponential distribution with the estimated lambda is ok.
+
+To get the sampling distribution of lambda, I use bootstrap method. The lambda is set to the estimated one from fitdistr(). The sample size is set to the static instruction amount. Results are saved in sim_lambda.
+
+```{r}
+sim_lambda <- NULL
+for(i in c(1:1000)) {
+    sim_lambda <- c(sim_lambda, 1/mean(rexp(length(exe_amount), rate=fit$estimate)))
+}
+```
+
+I can plot sim_lambda to see this sampling distribution.
+
+```{r}
+hist(sim_lambda)
+```
+
+As long as I have the sampling distribution, I can provide the confidence interval. Here, a 95% confidence interval is [0.1894, 0.2049]
+
+The standard error from such sampling distribution is closed to the one reported by fitdistr().
+
+```{r}
+quantile(sim_lambda, c(0.025, 0.975))
+```
+
+```{r}
+sd(sim_lambda)
+fit$sd
+```
+
+Then, I can answer question like "will lambda be bigger than 0.20".
+
+By looking for the sampling distribution, the probability bigger than 0.20 is 22%, which is the p-Value. Thus, if we set type-I error to 5% (one-sided), we cannot reject this null hypothesis. In other words, lambda is not bigger than 0.20.
+
+```{r}
+p_value <- sum(sim_lambda[sim_lambda>0.2])/sum(sim_lambda)
+p_value
+```
+
