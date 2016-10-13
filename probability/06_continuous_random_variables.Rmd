@@ -1,0 +1,285 @@
+---
+title: "06 Continuous Random Variables"
+output:
+  html_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+本章節對應LN.CH6，以R實作介紹連續隨機變數(continuous random variable)，以及其pdf/cdf/qf/rf．並說明continuous random variable (rv)的transformation和expectation．末了，介紹一些常見的continuous rv的distribution．並以課堂上提到的範例作演練．
+
+# Continuous random variables
+
+相對於discrete rv，continuous rv的值是連續的，也就是不可數的(uncountable)．生活中有許多例子，例如時間是連續的，標靶的面積是連續的等．
+
+Discrete和continuous rv在許多方面都很類似．Continuous rv也有對應的函式如下．
+
+其中pdf就是對應到pmf，但意義上有些微差異．而其他在意義上相同．我們在以下深入討論．
+
+* pdf: Probability Density Function
+* cdf: Cumulative Density Function
+* mgf: Moment Generating Function
+* qf : Quantile Function
+* rf : Random Generating Function
+
+# pdf/cdf/qf/rf
+
+以下的討論我們都是以Normal distribution為範例，這樣我們可以使用R現成的Normal distribution函式來操作．它的各個函式如下：
+
+* pdf: dnorm(x, mean = 0, sd = 1, log = FALSE)
+* cdf: pnorm(q, mean = 0, sd = 1, lower.tail = TRUE, log.p = FALSE)
+* qf : qnorm(p, mean = 0, sd = 1, lower.tail = TRUE, log.p = FALSE)
+* rf : rnorm(n, mean = 0, sd = 1)
+
+## rf
+
+複習在discrete rv所提到的，rv是一個值，只是背後有一機率在控制．若要感覺這概念，rf是最適當人選．當呼叫rf時，它都只會吐出一個值，這個值你無法預測，但背後控制的機率卻是確定的．
+
+以下面為例，要求吐出20個值，雖然無法預測會出現什麼值，但我們知道出現值出現的比例會遵循Normal distribution．這邊的Normal distribution參數採預設值(mean=0, sd=1)，也就是standard normal distribution(N(0,1))，所以出現的值會靠近0．
+
+可以觀察這些值的continuous特性．
+
+```{r}
+(rnum <- rnorm(20))
+```
+
+可以用R的hist()瞭解值的分佈狀況．
+
+```{r}
+hist(rnum)
+```
+
+## pdf
+
+在discrete rv時提到的pmf，是在各個可能值上的機率值，可理解為重量(mass)．而在continuous rv的pdf，則是變成在各個可能值上的密度(density)．之所以重量會變成密度，完全是因為值的continuous特性．在discrete rv的點上是有機率值的，但在continuous rv只有一段範圍內才有機率值，點是沒有機率值的．
+
+```{r}
+dnorm(0)
+```
+
+所以，既然pdf是算密度；不是機率，要計算機率，就必須把密度乘上一段距離．這個動作其實就是對pdf做積分．在下面範例中，我們試著對Normal distribution由負無限大積分到正無限大，來驗證總機率值是1．
+
+```{r}
+integrand <- function(x){ dnorm(x) }
+integrate(integrand, lower=-Inf, upper=Inf)
+```
+
+從圖形上理解，計算continuous rv的機率，其實就是求pdf的面積．下圖是N(0,1)的pdf，若我們要計算[0, 2.5]的機率值，求的就是紅色那塊面積．計算出來是0.4937903．
+
+```{r}
+integrate(integrand, lower=0, upper=2.5)
+```
+
+```{r, echo=FALSE}
+library(ggplot2)
+data <- data.frame(x=seq(-5, 5, 0.01), y=dnorm(seq(-5, 5, 0.01)))
+ggplot(data, aes(x=x, y=y)) + geom_line() +
+  geom_area(mapping = aes(x = ifelse(x>0 & x<2.5 , x, 0)), fill = "red") +
+  geom_point(x=0, y=dnorm(0), colour="red") +
+  geom_point(x=1, y=dnorm(1), colour="blue") +
+  ylim(0, 0.5)
+```
+
+雖然pdf是指密度；不是機率，但其值還是能反映出機率相對大小．例如在圖中，紅點的密度比藍點的密度高，在這兩點附近一段小範圍的機率值，紅點附近的機率值會比藍點附近的機率值高
+
+```{r}
+dnorm(0) > dnorm(1)
+```
+
+## cdf
+
+同等於discrete rv，continuous rv的cdf也是累進機率值．由0遞增至1，在特性、用法上都一樣．
+
+以上述範例為例，若我們要求N(0,1)介於[0, 2.5]，我們也可以用cdf計算，如下所示：
+
+```{r}
+pnorm(2.5)-pnorm(0)
+```
+
+其在cdf圖形上的理解，其實就是算高度差(圖中紅線的高度)．
+
+```{r, echo=FALSE}
+data <- data.frame(x=seq(-5, 5, 0.01), y=pnorm(seq(-5, 5, 0.01)))
+ggplot(data, aes(x=x, y=y)) + geom_line() +
+  geom_segment(aes(x=0, xend=0, y=0, yend=pnorm(0)), colour="blue") +
+  geom_segment(aes(x=2.5, xend=2.5, y=0, yend=pnorm(2.5)), colour="blue") +
+  geom_segment(aes(x=0, xend=0, y=pnorm(0), yend=pnorm(2.5)), colour="red", arrow = arrow(angle=20,type="closed",ends="both",length=unit(3,"mm")))
+```
+
+由以上關係得知，pdf做積分就是cdf．所以相反的看，cdf做微分也能反求pdf．
+
+事實上，根據課堂說明，pdf(pmf)/cdf/mgf三者只要知道任一個，就能推導其他兩個．
+
+```{r}
+library(numDeriv) # For grad
+# cdf在2.5的微分，等於pdf(2.5)
+f <- function(x) {pnorm(x, mean=0, sd=1)}
+grad(f, 2.5)
+dnorm(2.5, mean=0, sd=1)
+```
+
+## qf
+
+與discrete rv相同，qf正好就是cdf的反函式，cdf是接收x值，回傳機率值．qf則是接收機率值，回傳x值．
+
+```{r}
+pnorm(0)
+qnorm(0.5)
+```
+
+# Transformation
+
+Transformation是對隨機變數運算($+-*/log...$)，但是要把原本sample space上對應的集合的機率值搬過來．數學上表示法為：
+
+$$Y=g(X)$$
+
+舉例而言，若y1是x1做平方的transformation，那麼要知道y1=4的機率值，只要去找x1=-2和x1=2的機率值總和就是了．
+
+然而，在continuous rv上，因著pdf是密度而不是機率，因此搬機率值這件事不像discrete rv那麼直觀．在continuous rv有cdf和pdf兩種手法可以做．
+
+## Method of cdf
+
+要用cdf的手法做transformation時，需要注意$g(X)$是strictly increasing或是decreasing．若是strictly increasing，要用這公式：
+
+$$F_Y(y)=F_X(g^{-1}(y))$$
+
+若是strictly decreasing，要用這公式：
+
+$$F_Y(y)=1-F_X(g^{-1}(y))$$
+
+若$g(x)$不是strictly increasing/decreasing，則較為麻煩，必須要切成各段是strictly increasing/decreasing，然後分段處理．
+
+以下我們以$Y=g(X)=-3X+2$來示範transformation．這邊假設X是N(0,1)．
+
+為了驗證公式的確是對的，我們先產生N(0,1)的亂數1000筆(x)，直接對這1000筆值做transformation做出y．以下的圖顯示原本的x分佈(藍色)和y的分佈(紅色)．我們也把X的pdf畫上(藍線)，可以看見pdf所畫的跟亂數產生的是一致的．等等我們要比對用X的cdf推導出來的y的cdf，分佈會不會跟紅色區塊一致，藉此驗證我們的公式推導對不對．
+
+```{r}
+# Generate 1000 random number of N(0,1)
+x <- rnorm(1000)
+# Transform X to Y
+g <- function(x) { -1*3*x+2}
+y <- g(x)
+# Plot the histgram of x and y
+# Note that Y-axis is density, instead of count
+ggplot(data.frame(x=x), aes(x=x, ..density..)) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_line(aes(x=x, y=dnorm(x)), color="blue") +
+  geom_histogram(aes(x=y, ..density..), fill="red", alpha=0.2, bins=30)
+```
+
+藉由畫出$g(x)$，我們知道它是strictly decreasing．
+
+```{r}
+plot(g)
+```
+
+因此，我們應該採用這個轉換方式$F_Y(y)=1-F_X(g^{-1}(y))$．Fy就是Y的cdf．對其微分就能得到Y的pdf．
+
+```{r}
+# Get the inverse of g(X)
+g_inv <- function(y) {(y-2)/-3}
+Fy <- function(y) {1-pnorm(g_inv(y))}
+```
+
+為了畫出Y的pdf，我們對得到的cdf做微分(grad(Fy, y))來畫，結果如下圖．可以看見，我們用公式推導得到的Y的pdf跟Y的數據一致．
+
+```{r}
+ggplot(data.frame(x=x), aes(x=x, ..density..)) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_line(aes(x=x, y=dnorm(x)), color="blue") +
+  geom_histogram(aes(x=y, ..density..), fill="red", alpha=0.2, bins=30) +
+  geom_line(aes(x=y, y=grad(Fy, y)), color="red")
+```
+
+
+## Method of pdf
+
+Transformation也可以直接從pdf著手．公式如下．其背後的數學概念還是搬機率值，但因為pdf是密度、不是機率，因此會有$\left|\frac{\mathrm{d}g^{-1}(y)}{\mathrm{d}y}\right|$的調節項，用來調節X範圍的變化．
+
+$$f_Y(y)=f_X(g^{-1}(y))\left|\frac{\mathrm{d}g^{-1}(y)}{\mathrm{d}y}\right|$$
+
+我們以同樣的transformation $Y=g(X)=-3X+2$來示範，但這次直接用pdf操作．
+
+對於調節項，我們可以手動自己計算反函式微分的絕對值：反函式是$g^{-1}(Y)=\frac{Y-2}{-3}$，對Y做偏微分是$-\frac{1}{3}$，取絕對值後是$\frac{1}{3}$．
+
+或是，我們可以直接呼叫R的微分函式grad()和絕對值函式abs()也可以．兩者結果是一樣的．
+
+下圖畫上直接用X的pdf計算Y的pdf的結果，可以看見Y的pdf是符合實際資料分佈的．而且用手動推導(橘線)或是套公式(綠線)都是一樣的．
+
+```{r}
+# Manually calculate Y pdf
+fy1 <- function(y) {dnorm(g_inv(y))*(1/3)}
+# Use R function to calculate Y pdf
+fy2 <- function(y) {dnorm(g_inv(y))*abs(grad(g_inv, y))}
+ggplot(data.frame(x=x), aes(x=x, ..density..)) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_line(aes(x=x, y=dnorm(x)), color="blue") +
+  geom_histogram(aes(x=y, ..density..), fill="red", alpha=0.2, bins=30) +
+  geom_line(aes(x=y, y=fy1(y)), color="orange", size=2) +
+  geom_line(aes(x=y, y=fy1(y)), color="green")
+```
+
+## Distribution conversion
+
+Continuous rv有一個有趣的性質，任何distribution只要以它自己的cdf做transformation，都會變成Uniform distribution．而Uniform distribution以任何distribution的cdf反函式做transformation，就會變成該distribution．
+
+這原因乃是因為cdf的斜率代表的是資料的密度（cdf微分等於pdf），斜率越高表示資料越密集、斜率越低表示資料越稀疏．因此若把資料以cdf做transformation，資料密集的地方會被拉寬、資料稀疏的地方會被拉近，結果就是呈現均勻的狀態，也就是Uniform distribution．
+
+反之，Uniform distribution能夠變成任何distribution也是相同原理．
+
+下面示範由Exponential distribution(藍色)轉成Uniform distribution(紅色)．
+
+```{r}
+library(plyr) # For ddply
+# Generate x following exponential dist
+data <- data.frame(x = rexp(1000))
+# Transform x as y using x's cdf
+data <- ddply(data, .(x), transform, y=pexp(x))
+# Bi-plot x and y histogram
+ggplot(data, aes(x)) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_histogram(aes(x=y), fill="red", alpha=0.2, bins=30)
+```
+
+下面示範由Uniform distribution(藍色)轉成Normal distribution(紅色)．其實這就是在電腦軟體裡如何產生各種distribution的亂數值的方法．只要能夠產生Uniform distribution的亂數值，透過qf就可以產生各式各樣distribution的亂數．
+
+```{r}
+# Generate x following uniform dist
+data <- data.frame(x = runif(1000))
+# Transform x as y using x's cdf
+data <- ddply(data, .(x), transform, y=qnorm(x))
+# Bi-plot x and y histogram
+ggplot(data, aes(x)) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_histogram(aes(x=y), fill="red", alpha=0.2, bins=30)
+```
+
+用這方法轉換distribution改變的是機率值的分佈，但我們也需要注意值的改變．下圖示範由Exponential distribution轉成Normal distribution．由x-axis可看見值的範圍改變的．
+
+另一個重要的提醒是，原本值分佈的相對位置其實並不改變．在此我們在Exponential distribution的部份值塗上紅色，這些值是分佈在圖中左側．而當轉成Normal distribution後，那些紅色的值還是保持在左邊．
+
+先前曾經在machine learning的課程中提到anomily detection是以Normal distribution為假設，Normal的左右尾端視為異常．而如果不是的話也先轉成Normal再說．但在這我們就知道，如果原本不是Normal，其兩端不見得是要被視為異常，但如果轉成Normal之後，把左右尾端視為異常就是不正確的．
+
+舉例而言，中大樂透的等待時間是Exponential distribution，我們可能會想偵測很快就中獎是異常，而不想偵測很久都不中獎為異常．
+
+```{r, warning=FALSE}
+# Generate x following exponential dist, color some of them
+data <- data.frame(x = rexp(1000), type="origin")
+data[data$x>0.25,]$type <- "color1"
+# Transform x to y following normal dist
+data <- ddply(data, .(x), transform, y=qnorm(pexp(x)))
+
+# Convert data from wide format to long format for ggplot
+library("reshape2")
+long_data <- melt(data, id="type", variable.name="rv", value.name="value")
+ggplot(long_data, aes(x=value)) + geom_dotplot(aes(color=type), binwidth=0.2) + facet_grid(. ~rv)
+```
+
