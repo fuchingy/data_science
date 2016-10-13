@@ -1,0 +1,643 @@
+---
+title: "05 Discrete Random Variables"
+output:
+  pdf_document:
+    includes:
+      in_header: header.tex
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+本章節對應LN.CH5，以R實作介紹離散隨機變數(discrete random variable)，以及其pmf/cdf/qf/rf．並說明discrete random variable (rv)的transformation和expectation．末了，介紹一些常見的discrete rv的distribution．並以課堂上提到的範例作演練．
+
+# Discrete random variables
+
+隨機變數(random variable)是從原本的樣本空間經過某種轉換(transformation)到實數線上．呈現出來的是一個值，但背後有一種機率在控制著．呈現出來的值若是discrete的，那這隨機變數就是離散的．若是continuous的，那就是連續的隨機變數．
+
+以丟銅板三次為範例．因為每個銅板只會有正(h)反(t)兩面的結果，所以丟三次銅板可能出現的值只會有8種(outcome)，這8種稱為樣本空間(sample space)，在此我們存放在omega中．(LNp.5-3~LNp.5-11)
+
+這8種outcome有各自的機率值，假設銅板出現正反面的機率是均等的，那這8種outcome的機率值會是各1/8．
+
+```{r}
+# Generate all possible outcomes
+omega <- data.frame(trial1=c("h","h","h", "t", "h", "t", "t", "t"),
+                    trial2=c("h","h","t","h","t","h","t","t"),
+                    trial3=c("h","t","h","h","t","t","h","t"))
+omega
+```
+
+再來，我們以3種方式將這樣本空間transform到實數線上，這就形成3個rv．例如，本範例的第一個rv (x1)是銅板丟躑三次其中正面的次數、第二個rv (x2)是第一次是正面的次數、第三個rv (x3)是正面次數減去反面次數．
+
+```{r}
+library(plyr) # For ddply
+# Generate the outcome of the three random variables x1, x2, x3
+omega <- ddply(omega, .(trial1, trial2, trial3), transform,
+              x1=(trial1=="h")+(trial2=="h")+(trial3=="h"),
+              x2=sum(trial1=="h"),
+              x3=(trial1=="h")+(trial2=="h")+(trial3=="h")-(trial1=="t")-(trial2=="t")-(trial3=="t"))
+omega
+```
+
+當transformation發生時，rv的機率值會從原本的樣本空間(omega)被帶過來．舉例而言，銅板丟躑三次其中正面的次數只會有1和3兩種outcome，而其機率值由原本樣本空間那8種outcome的機率值所構成．
+
+以下的x1, x2, x3就是這三個rv．freq是其對應到原本sample space的發生次數，prob則是機率值．
+
+事實上，在機率論中我們常會談論到某某分佈(distribution)，這distribution實際上指的就是prob的分佈．Distribution名稱的由來，就是把1的總機率值分佈到各個可能的值的想法．
+
+```{r}
+# Calculate the probability and cumulative probability for x1, x2, x3
+x1 <- ddply(omega, .(x1), summarize, freq=length(x1), prob=freq/nrow(omega))
+x1
+x2 <- ddply(omega, .(x2), summarize, freq=length(x2), prob=freq/nrow(omega))
+x2
+x3 <- ddply(omega, .(x3), summarize, freq=length(x3), prob=freq/nrow(omega))
+x3
+```
+
+在這我順便也將x1~x3的累進(cumulative)機率值算出來，存在acc_prob中．累進機率值是以x由小至大的機率值逐漸加起來，因機率最小值為0、總和為1，故累進機率值會由0遞增到1．
+
+在機率論中，為了理論發展和實務應用，發展出了幾個有用的函式(function):
+
+* pmf: Probability Mass Function
+* cdf: Cumulative Density Function
+* mgf: Moment Generating Function
+* qf : Quantile Function
+* rf : Random Generating Function
+
+套用到這邊的例子，pmf就是接受x值，回傳prob．cdf就是接受x值，回傳acc_prob．quantile就是接受acc_prob，回傳x值．
+
+(qf和rf是我自己命名的縮寫．)
+
+(mgf在課堂上大部分是用來證明，實務上我還沒看到拿來當function用，所以這邊就沒有著墨，等將來有用到再說．)
+
+```{r}
+x1$acc_prob <- cumsum(x1$prob)
+x1
+x2$acc_prob <- cumsum(x2$prob)
+x2
+x3$acc_prob <- cumsum(x3$prob)
+x3
+```
+
+為了得到x1, x2, x3的pmf/cdf/qf，我們可以自己根據x1, x2, x3的資料設計function，最簡單的方式就是先把值都存在表中，然後查表就是了．
+
+但是R有提供更方便的函式DiscreteDistribution．我們只要把值和機率值填入，它就會自動產生出pmf/cdf/qf，甚至連遵從這distribution的亂數產生器都能產生出來．以下以x1為例，其pmf為x1.pmf、cdf為x1.cdf、qf為x1.quantile、rf為x1.rand．
+
+```{r, message=FALSE}
+library(distr)    # For DiscreteDistribution
+x1.dist <- DiscreteDistribution (supp = x1$x1, prob = x1$prob)
+x1.pmf <- d(x1.dist)  # pmf
+x1.cdf <- p(x1.dist)  # cdf
+x1.quantile <- q(x1.dist)  # qf
+x1.rand <- r(x1.dist) # rf
+```
+
+我們可以將這些pmf/cdf/qf畫出來看看．
+
+```{r}
+plot(x1.dist)
+```
+
+# pmf/cdf/qf/rf
+
+我們接著利用x1和其產生出來的pmf/cdf/qf/rf探討這些function的一些特性．
+
+## rf
+
+首先，我認為rf是最能體現rv這詞的概念．當呼叫rf時，它都只會吐出一個值，這個值你無法預測，但背後控制的機率卻是確定的．這就是隨機變數．
+
+以下面為例，要求x1吐出10個值，雖然無法預測會出現哪十個值，但我們知道出現1和2的比例會是最高的．
+
+```{r}
+x1.rand(10)
+```
+
+## pmf
+
+因著隨機變數會吐出來的值是固定的，舉x1為例，只會有[0, 3]，所以在這四個值上才會有機率．也就是說，x=2.5的話也是不會有機率值的．可參考以下x1.pmf的實例．
+
+這其實就是discrete rv的discrete特性，x值都是countable的．
+
+```{r}
+x1.pmf(2)
+x1.pmf(3)
+x1.pmf(2.5) # No probability exists at 2.5
+```
+
+## cdf
+
+然而，cdf就算x值不剛好落在x1上，只要是在區間內，還是會有機率值．原因是cdf的機率值是累進的．以下方為例，x1.cdf(2.5)是會有機率值的，而其值其實剛好就是x1=0, x1=1, x1=2的機率值總和．
+
+這裡需要特別注意的一點是，cdf的機率值累加是在x有出現機率值時，所以當x1在2有機率值時，x1.cdf(2)其實和x1.cdf(2.5)是一樣的．但x1.cdf(1.9)就不同了．
+
+```{r}
+x1.cdf(2.5) # probability exists at 2.5 due to cdf natural
+x1.pmf(0) + x1.pmf(1) + x1.pmf(2)
+x1.cdf(2)
+x1.cdf(1.9)
+```
+
+cdf在觀念上，可以想成要求X1小於等於某x1的機率值總和．而因著總機率值為1，所以如果要求X1大於某x1的機率值總合，只要用1減去就是了．如下面範例所示．
+
+```{r}
+x1.pmf(2) + x1.pmf(3) == 1 - x1.cdf(1.9)
+```
+
+## qf
+
+qf正好就是cdf的反函式，cdf是接收x值，回傳機率值．qf則是接收機率值，回傳x值．Quantile在之後的範圍估計(interval estimation)及假設檢定(hypothesis testing)很常用到，用來查詢某機率值假設之下的x值為何．
+
+```{r}
+x1.cdf(2)
+x1.quantile(0.875)
+```
+
+# Transformation
+
+因為rv是個值，所以可以對其做運算($+-*/log...$)，這個運算稱為Transformation．舉例而言，車輛銷售數目若是一個隨機變數car，那新車車輪數目wheel就是car*4．(LNp.5-12)
+
+先前提到rv的產生是稱為由原本樣本空間做transformation而來，這邊的transformation跟那時的概念是一樣的．可以理解為由某一個rv的樣本空間transformation到另一個rv的樣本空間．
+
+對值做運算很簡單，但運算過後的新rv，要計算其背後控制的機率分佈會變成什麼，就不那麼直覺．
+
+要計算transformation過後的變數的機率，根本的觀念在於，要把原本sample space上對應的集合的機率值搬過來．舉例而言，若y1是x1做平方的transformation，那麼要知道y1=4的機率值，只要去找x1=-2和x1=2的機率值總和就是了．
+
+在這我們以先前的x1為例，對其做transformation創造$y1=g(x)=x1^2$．我們示範兩種計算y1的方式．
+
+第一種方式是每一種x1都計算出y1，然後用y1的值和原本對應的x1的機率值，透過DiscreteDistribution()函式產生出pmf/cdf/...．
+
+```{r}
+# Assume a transformation Y1=g(X1): Y1=X1^2
+# Approach 1: map Y1 to the original sample space to get its pmf fy(Y=y)
+y1 <- ddply(x1, .(x1), transform, y1=x1^2)
+y1
+y1.dist <- DiscreteDistribution (supp = y1$y1, prob = y1$prob)
+y1.pmf <- d(y1.dist)
+```
+
+第二種方式是由數學推導上著手，用transformation的反函式做(詳情見課堂說明)．雖然不像第一種方式那麼直接，但概念上其實還是去原本sample space搬機率值就是了．
+
+由結果來看，第一種方法算出的y1.pmf和第二種方法算出的y1.pmf2是一樣的．
+
+```{r}
+# Approach 2: replace fx(X=x) with fx(X=g'(Y1))
+y1.pmf2 <- function(y) {
+  x1.pmf(sqrt(y)) + x1.pmf(-sqrt(y))
+}
+y1.pmf2(c(0:4))
+y1.pmf(c(0:4))
+
+```
+
+# Expection
+
+Expection是對資料做加權平均$E(X)=\sum_{x \in X}xf_X(x)$，以$E()$符號代表．如果是對原值做加權平均$E(X)$，結果就是平均$\mu_X$．如果是對$(X-\mu_X)^2$做加權平均$E((X-\mu_X)^2)$，結果就是變異數(variance)．根據公式，計算variance也可以用$E(x^2)-(E(x))^2$．(LNp.5-17)
+
+如果有原始資料的話，R的函式mean()就可以直接算平均了．但R的函式var()則不行，因為這算的是sample variance，會跟這邊定義的variance有些微差異．
+
+計算範例如下：
+
+```{r}
+x <- data.frame(x=c(0,1,2,3,4), fx=c(5/210, 50/210, 100/210, 50/210, 5/210))
+# calculate mean: x * f(x)
+(mean = sum(x$x * x$fx))
+# calculate variance: (x-u)^2 * f(x)
+(var = sum( (x$x - mean)^2 * x$fx ))
+# calculate variance: E(x^2) - (E(x))^2
+sum((x$x)^2 * x$fx) - (mean^2)
+```
+
+在mgf中會提到的第k個moment，其實就是$\mu_k=E(X^k)$．而第k個central moment，則是$\mu^\prime_k=E((X-\mu_X)^k)$．下方範例是計算x的第二個moment．
+
+Moment在統計中佔有很根本的角色，因為它能顯出rv的特徵值．舉例而言，first moment($\mu_1$)就是mean，顯出資料的重心．second central moment($\mu^\prime_2$)就是variance，顯出資料變動範圍．$\mu^\prime_3/\sigma^3$是skewness，顯出distribution的左右偏移．$\mu^\prime_4/\sigma^4$是kurtosis，顯出distribution的尖緩．
+
+```{r}
+# calculate moment: x^n * f(x)
+# here, n is set to 2: x^2 * f(x)
+n <- 2
+(mean_of_sqrt = sum((x$x)^n * x$fx))
+```
+
+提到Expectation就不免要順帶提到Mean Square Error (MSE)．MSE是用來評估數據相對於某定值c的距離，其評估方式是計算x距離c的平方的加權平均$E((X-c)^2)$．如果把c換成mean，就成了x的second central moment了．
+
+以下以c=3為範例計算MSE．有兩種計算方法，第一種就是用$E((X-c)^2)$來算．第二種則是可以用$variance+bias^2$來算，其實這就是根據先前所提到variance的第二種計算公式而來$E(X^2) - (E(X))^2$．
+
+第二種計算公式中的variance和bias也可稱為accuracy和precision．accuracy指的是資料集中度(用尺的精準度來想像)，就是variance的意義．而precision指的是離目標c的距離，也就是bias的意義．
+
+MSE在許多地方都廣泛應用，在統計學裡用來評估估計式(estimator)的效率(efficiency)．在deep learning裡當做cost function來評估學習效果．
+
+```{r}
+# Calculate MSE, given c=3
+c <- 3
+# Approach 1:
+mse1 <- sum((x$x - c)^2 * x$fx)
+mse1
+# Approach 2: bias and variance
+bias <- c-mean
+mse2 <- (var + bias^2)
+mse2
+```
+
+
+# Common Distribution Model
+
+以下列出常見的discrete distribution model，因為部份R的distribution function的參數和課堂上所假設的參數有些微差異，而日後實務上都是以R操作，所以所有討論描述都以R的distribution function prototype為主．
+
+## Binomial distribution
+
+-----------------------------------------------------------------------
+項目       內容
+---------- ------------------------------------------------------------
+描述       每次嘗試的成功機率為p，在n次嘗試中，成功幾次\
+           若n為1，則Binomial同等於Bernoulli\
+
+參數對應   定義的n=函式的size\
+           定義的p=函式的prob
+
+Notation   $X \sim Binomial(n, p)$ \
+
+Range      $x = \{0, 1, 2, ... n\}$ \
+
+pmf        $f_X(x)=\dbinom{n}{x}p^x(1-p)^{n-x},\forall x \in X$
+
+Parameters $n \in \{1,2,3,...\} and\ 0 \le p \le 1$
+
+Mean       $np$
+
+Variance   $np(1-p)$
+
+Skewness   $\frac{1-2p}{\sqrt{np(1-p)}}$
+
+Kurtosis   $\frac{6p^2-6p+1}{np(1-p)}$
+
+mgf        $M_X(t)=(1-p+pe^t)^n,\forall t < -\log(1-p)$
+
+pmf        dbinom(x, size, prob, log = FALSE)
+
+cdf        pbinom(q, size, prob, lower.tail = TRUE, log.p = FALSE)
+
+qf         qbinom(p, size, prob, lower.tail = TRUE, log.p = FALSE)
+
+rf         rbinom(n, size, prob)
+-----------------------------------------------------------------------
+
+以下為Binomial distribution的長相．若prob偏低，則機率高的會偏向成功次數低的；若prob偏高，則機率高的會偏向成功次數高的；若機率均等(0.5)，則會呈現左右對稱．
+
+```{r, echo=FALSE}
+library(ggplot2)
+
+plot_pmf <- function(plot_data, theta) {
+  theta$label_y <- max(plot_data$pmf) / c(1:nrow(theta))
+  # Plot pmf
+  ggplot(plot_data, aes(x=x)) + geom_bar(aes(y=pmf, fill=dist), stat="identity", position = "dodge") + 
+    geom_label(data=theta, aes(x=mean, y = label_y-0.01, label=paste0("kts=", round(kurtosis, 2)), color=dist)) +
+    geom_label(data=theta, aes(x=mean, y = label_y-0.05, label=paste0("skw=", round(skewness, 2)), color=dist)) + 
+    geom_segment(data=theta, aes(x = sd_fr, y = 0, xend = sd_to, yend = 0, colour=dist), arrow = arrow(angle=20,type="closed",ends="both",length=unit(3,"mm")))
+}
+
+plot_cdf <- function(plot_data, theta) {
+  # Plot cdf
+  ggplot(plot_data, aes(x=x)) + geom_bar(aes(y=cdf, fill=dist), stat="identity", position = "dodge") +
+    geom_segment(data=theta, aes(x = sd_fr, y = 0, xend = sd_to, yend = 0, colour=dist), arrow = arrow(angle=20,type="closed",ends="both",length=unit(3,"mm")))
+}
+
+# Produce the theta space
+x=c(0:10)
+theta <- data.frame(size=c(10, 10, 10), prob=c(0.1, 0.5, 0.9))
+theta <- ddply(theta, .(size, prob), transform, mean=size*prob, sd=sqrt(size*prob*(1-prob)), skewness=(1-2*prob)/sqrt(size*prob*(1-prob)), kurtosis=(6*(prob^2)-6*prob+1)/(size*prob*(1-prob)))
+theta <- ddply(theta, .(size, prob), transform, sd_fr=mean-sd, sd_to=mean+sd, dist=paste0("size=",size," prob=",prob))
+
+# Produce the data for ploting
+pmf <- NULL
+cdf <- NULL
+for(i in 1:nrow(theta)) {
+  pmf <- c(pmf, dbinom(x, theta[i,]$size, theta[i,]$prob))
+  cdf <- c(cdf, pbinom(x, theta[i,]$size, theta[i,]$prob))
+}
+plot_data <- data.frame(x=rep(x, 3), pmf=pmf, cdf=cdf, dist=rep(theta$dist, each=11))
+
+# Call function to plot
+plot_pmf(plot_data, theta)
+plot_cdf(plot_data, theta)
+
+# Uncomment the following code to verify the mean/var/skew/kurtosis equation
+#theta
+#ddply(plot_data, .(dist), summarize, mean=sum(x*pmf), sd=sqrt(sum((x-mean)^2*pmf)), skewness=sum(((x-mean)^3)*pmf)/sd^3, kurtosis=sum(((x-mean)^4)*pmf)/sd^4-3)
+```
+
+Binomial的應用練習．玩9次撲克牌，其中南方至少5次沒拿到Ace的機率為何? (LNp.5-20)
+
+```{r}
+# What is the probability that South gets no Aces on at least k=5 of n=9 hands?
+prob <- 0.3038
+sum(dbinom(c(5:9), 9, prob))
+```
+
+利用qf也可以反著問．玩9次撲克牌，若機率為0.9，至少會有幾次沒拿到Ace?
+
+```{r}
+# Given probability = 0.9, how many trails expected to have Aces at n=9 hands?
+qbinom(0.9, 9, prob)
+```
+
+## Negative binomial distribution
+
+-----------------------------------------------------------------------
+項目       內容
+---------- ------------------------------------------------------------
+描述       每次成功機率為p，要求r次成功，總共需要失敗幾次\
+           每次嘗試都視為獨立事件\
+           若r為1，則Negative Binomial同等於Geometric
+
+參數對應   定義的r=函式的size\
+           定義的p=函式的prob
+
+Notation   $X \sim Negative Binomial(r, p)$
+
+Range      $x = \{0, 1, 2, ...\}$
+
+pmf        $f_X(x)=\dbinom{x+r-1}{r-1}p^r(1-p)^{x},\forall x \in X$
+
+Parameters $r \in \{1,2,3,...\} and\ 0 \le p \le 1$
+
+Mean       $r/p-r$
+
+Variance   $r(1-p)/p^2$
+
+Skewness   $\frac{2-p}{\sqrt{r(1-p)}}$
+
+Kurtosis   $\frac{6-p(6-p)}{r(1-p)}$
+
+mgf        $M_X(t)=[\frac{pe^t}{1-(1-p)e^t}]^r,\forall t < -\log(1-p)$
+
+pmf        dnbinom(x, size, prob, mu, log = FALSE)
+
+cdf        pnbinom(q, size, prob, mu, lower.tail = TRUE, log.p = FALSE)
+
+qf         qnbinom(p, size, prob, mu, lower.tail = TRUE, log.p = FALSE)
+
+rf         rnbinom(n, size, prob, mu)
+
+備註       課堂上的X是總共需要幾次，而R的版本是總共失敗幾次．在這都以R的版本調整所有公式．
+-----------------------------------------------------------------------
+
+
+```{r, echo=FALSE}
+# Produce the theta space
+x=c(0:35)
+theta <- data.frame(size=c(2, 5, 9), prob=c(0.5, 0.5, 0.5))
+theta <- ddply(theta, .(size, prob), transform, mean=size/prob-size, sd=sqrt(size*(1-prob)/prob^2), skewness=(2-prob)/sqrt(size*(1-prob)), kurtosis=(6-prob*(6-prob))/(size*(1-prob)))
+theta <- ddply(theta, .(size, prob), transform, sd_fr=mean-sd, sd_to=mean+sd, dist=paste0("size=",size," prob=",prob))
+
+# Produce the data for ploting
+pmf <- NULL
+cdf <- NULL
+for(i in 1:nrow(theta)) {
+  pmf <- c(pmf, dnbinom(x, theta[i,]$size, theta[i,]$prob))
+  cdf <- c(cdf, pnbinom(x, theta[i,]$size, theta[i,]$prob))
+}
+plot_data <- data.frame(x=rep(x, 3), pmf=pmf, cdf=cdf, dist=rep(theta$dist, each=length(x)))
+
+# Call function to plot
+plot_pmf(plot_data, theta)
+plot_cdf(plot_data, theta)
+
+# Uncomment the following code to verify the mean/var/skew/kurtosis equation
+#theta
+#ddply(plot_data, .(dist), summarize, mean=sum(x*pmf), sd=sqrt(sum((x-mean)^2*pmf)), skewness=sum(((x-mean)^3)*pmf)/sd^3, kurtosis=sum(((x-mean)^4)*pmf)/sd^4-3)
+```
+
+Negative binomial和binomial是有相關的．因著Negative binomial是第size次成功所需要嘗試的次數(x)，可以想成在x-1次嘗試中只要成功size-1次(Binomial問題)，然後再下一次一定成功的機率．
+
+舉例來說，每次面試有1/3的機率錄取，如果要錄取3個人，總共剛好需要10次面試(失敗3次)的機率值是0.078．這機率值同等於在9次面試中錄取2個人的機率，再乘上下一次成功錄取的機率(1/3)．(LNp.5-27) 如以下所示：
+
+```{r}
+dnbinom(7, 3, 1/3)
+dbinom(2, 9, 1/3) * (1/3)
+```
+
+
+## Geometric distribution:
+
+-----------------------------------------------------------------------
+項目       內容
+---------- ------------------------------------------------------------
+描述       每次成功機率為p，要求1次成功，總共需要失敗幾次\
+           每次嘗試都視為獨立事件，有memoryless特性\
+           Negative Binomial的r為1時的特例\
+
+參數對應   定義的p=函式的prob
+
+Notation   $Geometry(p)$
+
+Range      $x = \{0, 1, 2, ...\}$
+
+pmf        $f_X(x)=p(1-p)^{x-1},\forall x \in X$
+
+Parameters $0 \le p \le 1$
+
+Mean       $1/p-1$
+
+Variance   $(1-p)/p^2$
+
+Skewness   $\frac{2-p}{\sqrt{1-p}}$
+
+Kurtosis   $5-p+\frac{1}{1-p}$
+
+mgf        $M_X(t)=\frac{pe^t}{1-(1-p)e^t},\forall t < -\log(1-p)$
+
+pmf        dgeom(x, prob, log = FALSE)
+
+cdf        pgeom(q, prob, lower.tail = TRUE, log.p = FALSE)
+
+qf         qgeom(p, prob, lower.tail = TRUE, log.p = FALSE)
+
+rf         rgeom(n, prob)
+
+備註       課堂上的X是總共需要幾次，而R的版本是總共失敗幾次．在這都以R的版本調整所有公式．
+-----------------------------------------------------------------------
+
+```{r, echo=FALSE}
+# Produce the theta space
+x=c(0:20)
+theta <- data.frame(prob=c(0.3, 0.5, 0.7))
+theta <- ddply(theta, .(prob), transform, mean=1/prob-1, sd=sqrt((1-prob)/prob^2), skewness=(2-prob)/(sqrt(1-prob)), kurtosis=5-prob+1/(1-prob))
+theta <- ddply(theta, .(prob), transform, sd_fr=mean-sd, sd_to=mean+sd, dist=paste0(" prob=",prob))
+
+# Produce the data for ploting
+pmf <- NULL
+cdf <- NULL
+for(i in 1:nrow(theta)) {
+  pmf <- c(pmf, dgeom(x, theta[i,]$prob))
+  cdf <- c(cdf, pgeom(x, theta[i,]$prob))
+}
+plot_data <- data.frame(x=rep(x, 3), pmf=pmf, cdf=cdf, dist=rep(theta$dist, each=length(x)))
+
+# Call function to plot
+plot_pmf(plot_data, theta)
+plot_cdf(plot_data, theta)
+
+# Uncomment the following code to verify the mean/var/skew/kurtosis equation
+#theta
+#ddply(plot_data, .(dist), summarize, mean=sum(x*pmf), sd=sqrt(sum((x-mean)^2*pmf)), skewness=sum(((x-mean)^3)*pmf)/sd^3, kurtosis=sum(((x-mean)^4)*pmf)/sd^4-3)
+```
+
+Geometric是第一次成功時所需要的嘗試次數，這其實就是當成功次數為1時的Negative binomial．(LNp.5-29) 如下範例所示：
+
+```{r}
+dnbinom(9, 1, 1/3)
+dgeom(9, 1/3)
+```
+
+## Poisson distribution:
+
+-----------------------------------------------------------------------
+項目       內容
+---------- ------------------------------------------------------------
+描述       每次嘗試的成功機率為p，在n次嘗試中，成功幾次\
+           必須條件: n很大, p很小\
+           lambda = n x p\
+           每次嘗試都視為獨立事件\
+
+Notation   $Poisson(\lambda)$
+
+Range      $x = \{1, 2, 3, ...\}$
+
+pmf        $f_X(x)=\lambda^xe^{-\lambda}/x!,\forall x \in X$
+
+Parameters $0 < \lambda < \infty$
+
+Mean       $\lambda$
+
+Variance   $\lambda$
+
+Skewness   $\lambda^{\frac{-1}{2}}$
+
+Kurtosis   $\frac{1}{\lambda}$
+
+mgf        $M_X(t)=e^{\lambda(e^\lambda-1)}$
+
+pmf        dpois(x, lambda, log = FALSE)
+
+cdf        ppois(q, lambda, lower.tail = TRUE, log.p = FALSE)
+
+qf         qpois(p, lambda, lower.tail = TRUE, log.p = FALSE)
+
+rf         rpois(n, lambda)
+
+備註       課堂上的參數和R有些不同．在這都以R的版本調整所有公式．
+-----------------------------------------------------------------------
+
+```{r, echo=FALSE}
+# Produce the theta space
+x=c(0:20)
+theta <- data.frame(lambda=c(2.5, 5, 7.5))
+theta <- ddply(theta, .(lambda), transform, mean=lambda, sd=sqrt(lambda), skewness=lambda^(-1/2), kurtosis=1/lambda)
+theta <- ddply(theta, .(lambda), transform, sd_fr=mean-sd, sd_to=mean+sd, dist=paste0(" lambda=",lambda))
+
+# Produce the data for ploting
+pmf <- NULL
+cdf <- NULL
+for(i in 1:nrow(theta)) {
+  pmf <- c(pmf, dpois(x, theta[i,]$lambda))
+  cdf <- c(cdf, ppois(x, theta[i,]$lambda))
+}
+plot_data <- data.frame(x=rep(x, 3), pmf=pmf, cdf=cdf, dist=rep(theta$dist, each=length(x)))
+
+# Call function to plot
+plot_pmf(plot_data, theta)
+plot_cdf(plot_data, theta)
+
+# Uncomment the following code to verify the mean/var/skew/kurtosis equation
+#theta
+#ddply(plot_data, .(dist), summarize, mean=sum(x*pmf), sd=sqrt(sum((x-mean)^2*pmf)), skewness=sum(((x-mean)^3)*pmf)/sd^3, kurtosis=sum(((x-mean)^4)*pmf)/sd^4-3)
+```
+
+```{r}
+# For verify the equation
+theta
+ddply(plot_data, .(dist), summarize, mean=sum(x*pmf), sd=sqrt(sum((x-mean)^2*pmf)), skewness=sum(((x-mean)^3)*pmf)/sd^3, kurtosis=sum(((x-mean)^4)*pmf)/sd^4-3)
+```
+
+A professor hits the wrong key with probability p=0.001 each time he types a letter. Assume independence for the occurrence of errors between different letter typings. What's the probability that 5 or more errors in n=2500 letters. (LNp.5-33)
+
+```{r}
+1-sum( dpois(c(0:4), 2500 * 0.001) )
+```
+
+Traffic accident occurs according to a Poisson process at a rate of 5.5 per month. What is the probability of 3 or more accidents occur in a 2 month periods?
+
+```{r}
+1-sum(dpois(c(0:2), lambda = 5.5 * 2))
+```
+
+## Hypergeometric distribution:
+
+-----------------------------------------------------------------------
+項目       內容
+---------- ------------------------------------------------------------
+描述       盒子中共有m個白球、n個黑球，從盒子中要抽k球(抽球後不放回)，其中幾個白球\
+           抽球後不放回，每次嘗試的成功機率不是獨立事件\
+           若抽球有放回，則是Binomial\
+           運用在工業上，用來了解產品瑕疵率\
+           m: 壞掉的產品\
+           n: 好的產品\
+           k: 抽驗產品數
+
+Notation   $Hypergeometric(m, n, k)$
+
+Range      $x = \{0, 1, 2, ..., n\}$
+
+pmf        $f_X(x)=\binom{m}{x}\binom{n}{k-x}/\binom{m+n}{k},\forall x \in X$
+
+Parameters $m, n, k \in \{1, 2, 3, ...\} and\ k \le m+n$
+
+Mean       $km/(m+n)$
+
+Variance   $\frac{kmn(m+n-k)}{(m+n)^2(m+n-1)}$
+
+Skewness   $\frac{-(m-n)(m+n-2k)}{m+n-2}\sqrt{\frac{m+n-1}{mnk(m+n-k)}}$
+
+Kurtosis   $\frac{1}{kmn(m+n-k)(m+n-2)(m+n-3)}[(m+n-1)(m+n)^2((m+n)(m+n+1)-6mn-6k(m+n-k))+6kmn(m+n-k)(5(m+n)-6)]$
+
+mgf        
+
+pmf        dhyper(x, m, n, k, log = FALSE)
+
+cdf        phyper(q, m, n, k, lower.tail = TRUE, log.p = FALSE)
+
+qf         qhyper(p, m, n, k, lower.tail = TRUE, log.p = FALSE)
+
+rf         rhyper(nn, m, n, k)
+-----------------------------------------------------------------------
+
+```{r, echo=FALSE}
+# Produce the theta space
+x=c(1:10)
+theta <- data.frame(m=c(10, 10, 10), n=c(2, 5, 7), k=c(8, 8, 8))
+theta <- ddply(theta, .(m, n, k), transform, mean=k*m/(m+n), sd=sqrt(k*m*n*(m+n-k)/(m+n)^2/(m+n-1)), skewness=-1*(m-n)*(m+n-2*k)/(m+n-2)*sqrt((m+n-1)/(m*n*k*(m+n-k))), kurtosis=1/(k*m*n*(m+n-k)*(m+n-2)*(m+n-3))*((m+n-1)*(m+n)^2*((m+n)*(m+n+1)-6*m*n-6*k*(m+n-k))+6*k*m*n*(m+n-k)*(5*(m+n)-6)))
+theta <- ddply(theta, .(m, n, k), transform, sd_fr=mean-sd, sd_to=mean+sd, dist=paste0("m=",m," n=",n," k=",k))
+
+# Produce the data for ploting
+pmf <- NULL
+cdf <- NULL
+for(i in 1:nrow(theta)) {
+  pmf <- c(pmf, dhyper(x, theta[i,]$m, theta[i,]$n, theta[i,]$k))
+  cdf <- c(cdf, phyper(x, theta[i,]$m, theta[i,]$n, theta[i,]$k))
+}
+plot_data <- data.frame(x=rep(x, 3), pmf=pmf, cdf=cdf, dist=rep(theta$dist, each=length(x)))
+
+# Call function to plot
+plot_pmf(plot_data, theta)
+plot_cdf(plot_data, theta)
+
+# Uncomment the following code to verify the mean/var/skew/kurtosis equation
+#theta
+#ddply(plot_data, .(dist), summarize, mean=sum(x*pmf), sd=sqrt(sum((x-mean)^2*pmf)), skewness=sum(((x-mean)^3)*pmf)/sd^3, kurtosis=sum(((x-mean)^4)*pmf)/sd^4-3)
+```
