@@ -64,11 +64,19 @@ x3
 
 在機率論中，為了理論發展和實務應用，發展出了幾個有用的函式(function):
 
-* pmf: Probability Mass Function
-* cdf: Cumulative Density Function
-* mgf: Moment Generating Function
-* qf : Quantile Function
-* rf : Random Generating Function
+----------------------------------------------
+函式  全名                         數學表示式
+----- ---------------------------- -----------
+pmf   Probability Mass Function    $f_X(x)$
+
+cdf   Cumulative Density Function  $F_X(X)$
+
+mgf   Moment Generating Function   $M_X(t)$
+
+qf    Quantile Function
+
+rf    Random Generating Function
+----------------------------------------------
 
 套用到這邊的例子，pmf就是接受x值，回傳prob．cdf就是接受x值，回傳acc_prob．quantile就是接受acc_prob，回傳x值．
 
@@ -120,19 +128,35 @@ x1.rand(10)
 
 ## pmf
 
-因著隨機變數會吐出來的值是固定的，舉x1為例，只會有[0, 3]，所以在這四個值上才會有機率．也就是說，x=2.5的話也是不會有機率值的．可參考以下x1.pmf的實例．
+pmf若要成立，需要符合以下3個條件．第一是機率值必須要大於等於0，第二是在x不存在的地方機率值為0，第三是總機率值必須等於1．
 
-這其實就是discrete rv的discrete特性，x值都是countable的．
+$$f_X(x) \ge 0,\mbox{ for all } x \in \mathbb{R}$$
+$$f_X(x) = 0,\mbox{ for }x \notin X$$
+$$\sum_{x \in X}f_X(x)=1$$
+
+以x1為例，pmf的回傳值一定大於0．
+
+而因為其只會有[0, 3]四種outcome，所以在這四個值上才會有機率．舉例而言，x=2.5是不會有機率值的．可參考以下x1.pmf的實例．這其實就是discrete rv的discrete特性，x值都是countable的．
+
+再者，我們把所有機率值加總，和為1．
 
 ```{r}
+x1.pmf(c(0:3))
 x1.pmf(2)
 x1.pmf(3)
 x1.pmf(2.5) # No probability exists at 2.5
+sum(x1.pmf(c(0:3))) # Total probability is 1
 ```
 
 ## cdf
 
-然而，cdf就算x值不剛好落在x1上，只要是在區間內，還是會有機率值．原因是cdf的機率值是累進的．以下方為例，x1.cdf(2.5)是會有機率值的，而其值其實剛好就是x1=0, x1=1, x1=2的機率值總和．
+cdf若要成立，需要符合以下3個條件．第一是累進機率值必須不遞減，第二是累進機率值必須能由右至左逼近，第三是累進機率值必須由0增加到1．
+
+$$F_X(x)\mbox{ is nondecreasing}$$
+$$\mbox{For any }x \in \mathbb{R}, F_X(x)\mbox{ is continuous from the right}$$
+$$\lim_{x \to \infty}F_X(x)=1 \mbox{ and } \lim_{x \to -\infty}F_X(x)=0$$
+
+cdf因為是累進的機率值，就算值不剛好落在x1上，只要是在區間內，還是會有機率值．以下方為例，x1.cdf(2.5)是會有機率值的，而其值其實剛好就是x1=0, x1=1, x1=2的機率值總和．
 
 這裡需要特別注意的一點是，cdf的機率值累加是在x有出現機率值時，所以當x1在2有機率值時，x1.cdf(2)其實和x1.cdf(2.5)是一樣的．但x1.cdf(1.9)就不同了．
 
@@ -160,13 +184,19 @@ x1.quantile(0.875)
 
 # Transformation
 
-因為rv是個值，所以可以對其做運算($+-*/log...$)，這個運算稱為Transformation．舉例而言，車輛銷售數目若是一個隨機變數car，那新車車輪數目wheel就是car*4．(LNp.5-12)
+因為rv是個值，所以可以對其做運算($+-*/log...$)，這個運算稱為Transformation．舉例而言，車輛銷售數目若是一個隨機變數car，那新車車輪數目wheel就是car*4．若是對X做transformation成為Y，在數學上表示法為：(LNp.5-12)
+
+$$Y=g(X)$$
 
 先前提到rv的產生是稱為由原本樣本空間做transformation而來，這邊的transformation跟那時的概念是一樣的．可以理解為由某一個rv的樣本空間transformation到另一個rv的樣本空間．
 
 對值做運算很簡單，但運算過後的新rv，要計算其背後控制的機率分佈會變成什麼，就不那麼直覺．
 
-要計算transformation過後的變數的機率，根本的觀念在於，要把原本sample space上對應的集合的機率值搬過來．舉例而言，若y1是x1做平方的transformation，那麼要知道y1=4的機率值，只要去找x1=-2和x1=2的機率值總和就是了．
+## Method of pmf
+
+要計算transformation過後的變數的機率，根本的觀念在於，要把原本sample space上對應的集合的機率值搬過來．舉例而言，若y1是x1做平方的transformation，那麼要知道y1=4的機率值，只要去找x1=-2和x1=2的機率值總和就是了．用數學公式寫出來是這樣子：
+
+$$f_Y(y)=\sum_{x \in X, g(x)=y}f_X(x)$$
 
 在這我們以先前的x1為例，對其做transformation創造$y1=g(x)=x1^2$．我們示範兩種計算y1的方式．
 
@@ -197,7 +227,7 @@ y1.pmf(c(0:4))
 
 # Expection
 
-Expection是對資料做加權平均$E(X)=\sum_{x \in X}xf_X(x)$，以$E()$符號代表．如果是對原值做加權平均$E(X)$，結果就是平均$\mu_X$．如果是對$(X-\mu_X)^2$做加權平均$E((X-\mu_X)^2)$，結果就是變異數(variance)．根據公式，計算variance也可以用$E(x^2)-(E(x))^2$．(LNp.5-17)
+Expection是對資料做加權平均$E(X)=\sum_{x \in X}xf_X(x)$，以$E()$符號代表．如果是對原值做加權平均$E(X)$，結果就是平均$\mu_X$．如果是對$(X-\mu_X)^2$做加權平均$E((X-\mu_X)^2)$，結果就是變異數(variance)$\sigma_X^2$．根據公式，計算variance也可以用$E(x^2)-(E(x))^2$．(LNp.5-17)
 
 如果有原始資料的話，R的函式mean()就可以直接算平均了．但R的函式var()則不行，因為這算的是sample variance，會跟這邊定義的variance有些微差異．
 
@@ -244,6 +274,39 @@ mse2 <- (var + bias^2)
 mse2
 ```
 
+## Expectation of transformation
+
+數學上，若要求transformation後的expectation，不需要先求出transformation後的distribution再求expection，而是可以直接用原本的expectation就可以算出來．
+
+在這我們假設transformation是$Y=g(X)$．要求Y的expectation，公式如下．
+
+$$E(Y)=\sum_{x \in X}g(x)f_X(x)$$
+
+這定理被稱為LOTUS: Law of the Unconscious Statistician (意識不清的統計學家定理)．這名稱的由來大概是因為大家都被複雜的transformation弄到頭昏腦脹了，連算transformation的expection都覺得這一定要很困難的機率搬移，而事實上，只是對原值做運算而已，對於頭腦不清楚的統計學家實在是簡單到不可思議．
+
+如果假設$Y=g(X)=aX+b$這樣的線性轉換的話，應用到$\mu_X$和$\sigma_X$的transformation會是這樣：
+
+$$\mbox{For }a, b \in \mathbb{R}, E(aX+b)=aE(X)+b$$
+
+$$\mbox{For }a, b \in \mathbb{R}, Var(aX+b)=a^2Var(X)$$
+
+以x1為例，若我們做$Y=2X+3$的transformation，以下範例顯示，對x做transformation再算$\mu_Y$和$\sigma_Y$，跟直接用$\mu_X$和$\sigma_X$計算，結果是一樣的．
+
+藉由此範例，我們可以來討論mean和variance的transformation意義．下圖畫出x1(藍)和y(紅)的distribution．
+
+mean直觀上代表的是distribution的重心．當線性轉換發生時，重心就跟著轉換．倍數a和偏移量b都會對重心影響．原本x1的重心在2，經過$Y=2X+3$轉換後到了7．
+
+variance直觀上代表的是distribution以重心為基準的分散程度．當線性轉換發生時，分散程度只跟倍數a有關係，偏移量b是不影響分散程度的．而分散程度影響的幅度是$a^2$倍．
+
+```{r}
+g <- function(x) {2*x+3}
+x <- ddply(x, .(x), transform, y=g(x))
+sum(x$y*x$fx) == g(mean)
+sum((x$y-mean(x$y))^2*x$fx) == 2^2 * var
+library(ggplot2)
+ggplot(x, aes(x=x, y=fx)) + geom_bar(stat="identity", color="blue", alpha=0.2, width=0.5) +
+  geom_bar(aes(x=y, y=fx), stat="identity", color="red", alpha=0.2, width=0.5)
+```
 
 # Common Distribution Model
 
@@ -290,8 +353,6 @@ rf         rbinom(n, size, prob)
 以下為Binomial distribution的長相．若prob偏低，則機率高的會偏向成功次數低的；若prob偏高，則機率高的會偏向成功次數高的；若機率均等(0.5)，則會呈現左右對稱．
 
 ```{r, echo=FALSE}
-library(ggplot2)
-
 plot_pmf <- function(plot_data, theta) {
   theta$label_y <- max(plot_data$pmf) / c(1:nrow(theta))
   # Plot pmf
@@ -387,6 +448,7 @@ rf         rnbinom(n, size, prob, mu)
 備註       課堂上的X是總共需要幾次，而R的版本是總共失敗幾次．在這都以R的版本調整所有公式．
 -----------------------------------------------------------------------
 
+下圖我們固定成功機率值，觀察要求成功次數不同對distribution的影響．我們可發現如果只要求2次成功，那麼機率值就會集中在x值比較小的部分．隨著要求成功的次數增加，所需要的總失敗次數也跟著增加．
 
 ```{r, echo=FALSE}
 # Produce the theta space
@@ -463,6 +525,8 @@ rf         rgeom(n, prob)
 備註       課堂上的X是總共需要幾次，而R的版本是總共失敗幾次．在這都以R的版本調整所有公式．
 -----------------------------------------------------------------------
 
+下圖我們觀察成功機率值對distribution的影響．我們可發現如果成功機率偏高，那麼機率值就會集中在x值比較小的部分．如果成功機率減低，較大的x值就會出現，distribution往右的尾巴會拉長．
+
 ```{r, echo=FALSE}
 # Produce the theta space
 x=c(0:20)
@@ -533,6 +597,8 @@ rf         rpois(n, lambda)
 
 備註       課堂上的參數和R有些不同．在這都以R的版本調整所有公式．
 -----------------------------------------------------------------------
+
+由下圖看見，隨著成功率提升，成功次數也提升．
 
 ```{r, echo=FALSE}
 # Produce the theta space
@@ -616,6 +682,8 @@ qf         qhyper(p, m, n, k, lower.tail = TRUE, log.p = FALSE)
 
 rf         rhyper(nn, m, n, k)
 -----------------------------------------------------------------------
+
+以下我們固定白球和抽球次數，但逐漸增加黑球數目來觀察distribution變化．隨著黑球數目增加時，抽到白球的機率逐漸下降，機率值往x小的地方偏移．
 
 ```{r, echo=FALSE}
 # Produce the theta space
