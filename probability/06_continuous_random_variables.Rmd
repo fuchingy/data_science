@@ -24,11 +24,19 @@ Discrete和continuous rv在許多方面都很類似．Continuous rv也有對應�
 
 其中pdf就是對應到pmf，但意義上有些微差異．而其他在意義上相同．我們在以下深入討論．
 
-* pdf: Probability Density Function
-* cdf: Cumulative Density Function
-* mgf: Moment Generating Function
-* qf : Quantile Function
-* rf : Random Generating Function
+----------------------------------------------
+函式  全名                         數學表示式
+----- ---------------------------- -----------
+pdf   Probability Density Function $f_X(x)$
+
+cdf   Cumulative Density Function  $F_X(X)$
+
+mgf   Moment Generating Function   $M_X(t)$
+
+qf    Quantile Function
+
+rf    Random Generating Function
+----------------------------------------------
 
 # pdf/cdf/qf/rf
 
@@ -58,6 +66,11 @@ hist(rnum)
 ```
 
 ## pdf
+
+pdf若要成立，需要符合以下2個條件．第一是其值必須要大於等於0，第二是積分必須等於1．
+
+$$f(x) \ge 0,\mbox{ for all } x \in (-\infty, \infty)$$
+$$\int_{-\infty}^{\infty}f(x)dx=1$$
 
 在discrete rv時提到的pmf，是在各個可能值上的機率值，可理解為重量(mass)．而在continuous rv的pdf，則是變成在各個可能值上的密度(density)．之所以重量會變成密度，完全是因為值的continuous特性．在discrete rv的點上是有機率值的，但在continuous rv只有一段範圍內才有機率值，點是沒有機率值的．
 
@@ -95,6 +108,12 @@ dnorm(0) > dnorm(1)
 ```
 
 ## cdf
+
+cdf若要成立，需要符合的條件和discrete的一樣．還是列在下方當參考．
+
+$$F_X(x)\mbox{ is nondecreasing}$$
+$$\mbox{For any }x \in \mathbb{R}, F_X(x)\mbox{ is continuous from the right}$$
+$$\lim_{x \to \infty}F_X(x)=1 \mbox{ and } \lim_{x \to -\infty}F_X(x)=0$$
 
 同等於discrete rv，continuous rv的cdf也是累進機率值．由0遞增至1，在特性、用法上都一樣．
 
@@ -145,9 +164,11 @@ $$Y=g(X)$$
 
 然而，在continuous rv上，因著pdf是密度而不是機率，因此搬機率值這件事不像discrete rv那麼直觀．在continuous rv有cdf和pdf兩種手法可以做．
 
+但無論是cdf或是pdf，在continuous rv上為了使從Y找X (也就是$g^{-1}(X)$)能有one-to-one對應關係，以使得搬機率值可以搬對，$g(X)$必須符合strictly monotone的條件，意指是strictly increasing或是decreasing．若不是的話，稱為general piecewise monotone的，處理手法上還是需要切成各段符合strictly monotone，然後分段處理．
+
 ## Method of cdf
 
-要用cdf的手法做transformation時，需要注意$g(X)$是strictly increasing或是decreasing．若是strictly increasing，要用這公式：
+要用cdf的手法做transformation時，若$g(X)$是strictly increasing，要用這公式：
 
 $$F_Y(y)=F_X(g^{-1}(y))$$
 
@@ -155,7 +176,9 @@ $$F_Y(y)=F_X(g^{-1}(y))$$
 
 $$F_Y(y)=1-F_X(g^{-1}(y))$$
 
-若$g(x)$不是strictly increasing/decreasing，則較為麻煩，必須要切成各段是strictly increasing/decreasing，然後分段處理．
+若$g(x)$是general piecewise monotone的，則必須切成各段符合strictly monotone，然後分段處理．
+
+### Strictly monotone case
 
 以下我們以$Y=g(X)=-3X+2$來示範transformation．這邊假設X是N(0,1)．
 
@@ -178,7 +201,7 @@ ggplot(data.frame(x=x), aes(x=x, ..density..)) +
 藉由畫出$g(x)$，我們知道它是strictly decreasing．
 
 ```{r}
-plot(g)
+curve(g, -10, 10)
 ```
 
 因此，我們應該採用這個轉換方式$F_Y(y)=1-F_X(g^{-1}(y))$．Fy就是Y的cdf．對其微分就能得到Y的pdf．
@@ -199,14 +222,78 @@ ggplot(data.frame(x=x), aes(x=x, ..density..)) +
   geom_line(aes(x=y, y=grad(Fy, y)), color="red")
 ```
 
+### General piecewise monotone
+
+那如果$g(X)$不是strictly monotone，要如何處理？以下我們以$Y=g(X)=-3X^2+2$來示範transformation．一樣假設X是N(0,1)．
+
+同樣的，為了驗證公式是對的，我們先產生N(0,1)的亂數1000筆(x)，直接對這1000筆值做transformation做出y，做出對照組．
+
+因為我用R的grad()對求出來的Y cdf微分時出現錯誤(需要了解grad()的限制)，所以無法得到Y的pdf．為了驗證cdf的確是正確的，我把資料畫成累進分布圖，以便跟cdf比對．以下的圖顯示原本的x累進分佈(藍色)和y的累進分佈(紅色)．我們也把X的cdf畫上(藍線)，可以看見cdf所畫的跟亂數產生的是一致的．等等我們要比對用X的cdf推導出來的y的cdf，分佈會不會跟紅色區塊一致，藉此驗證我們的公式推導對不對．
+
+```{r}
+# Generate 1000 random number of N(0,1)
+x <- rnorm(1000)
+# Transform X to Y
+g <- function(x) { -1*3*x^2+2}
+y <- g(x)
+# Plot the histgram of x and y
+# Note that Y-axis is density, instead of count
+ggplot(data.frame(x=x), aes(x=x, cumsum(..density..))) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_line(aes(x=x, y=pnorm(x)), color="blue") +
+  geom_histogram(aes(x=y, cumsum(..density..)), fill="red", alpha=0.2, bins=30)
+```
+
+藉由畫出$g(x)$，我們知道它是general piecewise monotone的，所以我們必須分段處理．我們可以看見小於0是strictly decreasing，大於0是strictly increasing．
+
+```{r}
+curve(g, -2, 2)
+```
+
+這裡必須要用數學推導了，我不知道有什麼R現成的函式可以省事．
+
+原則上做法是，先由$g(X)$的圖形上觀察X和Y的關係，然後以cdf的觀點把Y和X關聯起來．例如在這裡，我們得出$Y \le y$的範圍同等於$X \le -g^{-1}(y)$以及$X \ge g^{-1}(y)$的範圍，接著就可以用X的cdf來代換．
+
+於是我們得出，Y的cdf就是X的兩個cdf相減，至此我們就可以在R中實做了(如下面範例的Fy)．
+
+$$
+\begin{align}
+F_Y(y) = P(Y \le y) & = P( X \le -g^{-1}(y)) + P( X \ge g^{-1}(y)) \\
+& = F_X(-g^{-1}(y)) + (1 - F_X(g^{-1}(y)) )
+\end{align}
+$$
+
+```{r}
+# Get the inverse of g(X)
+g_inv <- function(y) {sqrt((y-2)/-3)}
+Fy <- function(y) {
+  pnorm(-1*g_inv(y)) + (1 - pnorm(g_inv(y)))
+}
+```
+
+我們把求出來Y的cdf畫上，結果如下圖．可以看見，我們用公式推導得到的Y的cdf跟Y的數據一致．
+
+```{r}
+ggplot(data.frame(x=x), aes(x=x, cumsum(..density..))) +
+  geom_histogram(fill="blue", alpha=0.2, bins=30) +
+  geom_line(aes(x=x, y=pnorm(x)), color="blue") +
+  geom_histogram(aes(x=y, cumsum(..density..)), fill="red", alpha=0.2, bins=30) +
+  geom_line(aes(x=y, y=Fy(y)), color="red")
+```
 
 ## Method of pdf
 
-Transformation也可以直接從pdf著手．公式如下．其背後的數學概念還是搬機率值，但因為pdf是密度、不是機率，因此會有$\left|\frac{\mathrm{d}g^{-1}(y)}{\mathrm{d}y}\right|$的調節項，用來調節X範圍的變化．
+用pdf手法做，也要考慮到strictly monotone的性質，同樣以上述兩種transformation做範例．
+
+### Strictly monotone case
+
+Transformation也可以直接從pdf著手．雖然pdf還是在乎strictly monotone特性，但不管是increasing或是decreasing，其公式都是一樣：
+
+公式背後的數學概念還是搬機率值，但因為pdf是密度、不是機率，因此會有$\left|\frac{\mathrm{d}g^{-1}(y)}{\mathrm{d}y}\right|$的調節項，用來調節X範圍的變化．
 
 $$f_Y(y)=f_X(g^{-1}(y))\left|\frac{\mathrm{d}g^{-1}(y)}{\mathrm{d}y}\right|$$
 
-我們以同樣的transformation $Y=g(X)=-3X+2$來示範，但這次直接用pdf操作．
+我們以同樣的transformation $Y=g(X)=-3X+2$來示範，我們已經知道這是strictly monotone．但這次直接用pdf操作．
 
 對於調節項，我們可以手動自己計算反函式微分的絕對值：反函式是$g^{-1}(Y)=\frac{Y-2}{-3}$，對Y做偏微分是$-\frac{1}{3}$，取絕對值後是$\frac{1}{3}$．
 
@@ -215,6 +302,13 @@ $$f_Y(y)=f_X(g^{-1}(y))\left|\frac{\mathrm{d}g^{-1}(y)}{\mathrm{d}y}\right|$$
 下圖畫上直接用X的pdf計算Y的pdf的結果，可以看見Y的pdf是符合實際資料分佈的．而且用手動推導(橘線)或是套公式(綠線)都是一樣的．
 
 ```{r}
+# Generate 1000 random number of N(0,1)
+x <- rnorm(1000)
+# Transform X to Y
+g <- function(x) { -1*3*x+2}
+y <- g(x)
+# Get the inverse of g(X)
+g_inv <- function(y) {(y-2)/-3}
 # Manually calculate Y pdf
 fy1 <- function(y) {dnorm(g_inv(y))*(1/3)}
 # Use R function to calculate Y pdf
@@ -224,8 +318,24 @@ ggplot(data.frame(x=x), aes(x=x, ..density..)) +
   geom_line(aes(x=x, y=dnorm(x)), color="blue") +
   geom_histogram(aes(x=y, ..density..), fill="red", alpha=0.2, bins=30) +
   geom_line(aes(x=y, y=fy1(y)), color="orange", size=2) +
-  geom_line(aes(x=y, y=fy1(y)), color="green")
+  geom_line(aes(x=y, y=fy2(y)), color="green")
 ```
+
+### General piecewise monotone
+
+示範用pdf處理general piecewise monotone的$g(X)$的transformation，因為我有點累了，所以留待日後有空再回來補範例．
+
+原則上，還是需要分段處理．其數學公式如下：
+
+$$f_Y(y)=\sum_{i=1}^{n} \delta_i f_x(g_i^{-1}(y) \left| \frac{\mathrm{d}g_i^{-1}(y)}{\mathrm{d}y} \right|  )$$
+
+$$
+\delta_i =
+\begin{cases} 
+1,& \mbox{if }\exists x_i \mbox{ s.t. } g_i(x_i)=y\\
+0, & \mbox{otherwise}
+\end{cases}
+$$
 
 ## Distribution conversion
 
@@ -282,4 +392,139 @@ library("reshape2")
 long_data <- melt(data, id="type", variable.name="rv", value.name="value")
 ggplot(long_data, aes(x=value)) + geom_dotplot(aes(color=type), binwidth=0.2) + facet_grid(. ~rv)
 ```
+
+# Expection
+
+如同在discrete rv，expection在continuous rv還是對資料做加權平均，概念上依然沒有改變．但是在continuous rv機率值若以pdf來思考變成是面積，所以若是用pdf計算$E(X)$，要用積分的方式計算．
+
+題外話，因為是用積分計算，所以如果結果是$\infty$(無法converge absolutely)，$E(X)$是不存在的．某些distribution例如Cauchy distribution就是這樣．
+
+$$E(X)=\int_{-\infty}^{\infty}xf_X(x)dx$$
+
+mean和variance也是同樣的算法，只是換成積分式．在這只列出公式，就不多討論了．
+
+$$\mu_X=E(X)=\int_{-\infty}^{\infty}xf_X(x)dx$$
+
+$$\sigma_X^2=E[(X-\mu_X)^2]=\int_{-\infty}^{\infty}(x-\mu_X)^2f_X(x)dx$$
+
+對expectation做線性轉換的公式(神智不清統計學家定理)也與discrete一樣，也只是換成積分式，不多討論．
+
+$$E(Y)=\int_{-\infty}^{\infty}g(x)f_X(x)dx$$
+
+$$\mbox{For }a, b \in \mathbb{R}, E(aX+b)=aE(X)+b$$
+
+$$\mbox{For }a, b \in \mathbb{R}, Var(aX+b)=a^2Var(X)$$
+
+## Calculate expectation by cdf
+
+在課堂上還提到可以用cdf計算expectation，但我還不能體會其精神，且不確定我會不會用到，所以在這先只列公式．
+
+對於nonnegative continuous rv的expection可這麼算：
+
+$$E(X)=\int_{0}^{\infty}1-F_X(x)dx=\int_{0}^{\infty}P(X>x)dx$$
+
+廣義拓展的話，可這麼算
+
+$$E(X)=\int_{0}^{\infty}P(X>x)dx - \int_{-\infty}^{0}P(X<x)dx$$
+
+# Common Distribution Model
+
+以下列出常見的discrete distribution model，如果R的distribution function的參數和課堂上所假設的參數有些微差異，為了日後實務上需求，所有討論描述都以R的distribution function prototype為主．
+
+## Uniform distribution
+
+-----------------------------------------------------------------------
+項目       內容
+---------- ------------------------------------------------------------
+描述       介於a到b之間的值的機率是一樣的\
+
+參數對應   定義的a=函式的min\
+           定義的b=函式的max
+
+Notation   $X \sim Uniform(a, b)$ \
+
+pdf        $f(x) = \begin{cases} 
+                   1/(b-a), & \mbox{if }a < x \le b\\
+                   0,       & \mbox{otherwise}
+                   \end{cases}$
+
+cdf        $F(x) = \begin{cases} 
+                   0,           & \mbox{if }x \le a\\
+                   (x-a)/(b-a), & \mbox{if }a < x \le b\\
+                   1,           & \mbox{if }x > b
+                   \end{cases}$
+
+Parameters $-\infty < a < b < \infty$
+
+Mean       $(a+b)/2$
+
+Variance   $(b-a)^2/12$
+
+Skewness   $0$
+
+Kurtosis   $-\frac{6}{5}$
+
+mgf        $M_X(t)=\frac{e^{bt}-e^{at}}{t(b-a)}$
+
+pdf        dunif(x, min = 0, max = 1, log = FALSE)
+
+cdf        punif(q, min = 0, max = 1, lower.tail = TRUE, log.p = FALSE)
+
+qf         qunif(p, min = 0, max = 1, lower.tail = TRUE, log.p = FALSE)
+
+rf         runif(n, min = 0, max = 1)
+-----------------------------------------------------------------------
+
+以下為Uniform distribution的長相．機率值都是均等的．可以發現因著總面積(機率)必須是1，隨著a和b的距離越大，pdf的高度(密度)會變低．
+
+```{r, echo=FALSE}
+plot_pmf <- function(plot_data, theta) {
+  theta$label_y <- max(plot_data$pdf) / c(1:nrow(theta))
+  # Plot pmf
+  ggplot(plot_data, aes(x=x)) + geom_line(aes(y=pdf, color=dist)) +
+    geom_label(data=theta, aes(x=mean, y = label_y-0.01, label=paste0("kts=", round(kurtosis, 2)), color=dist)) +
+    geom_label(data=theta, aes(x=mean, y = label_y-0.05, label=paste0("skw=", round(skewness, 2)), color=dist)) +
+    geom_segment(data=theta, aes(x = sd_fr, y = 0, xend = sd_to, yend = 0, colour=dist), arrow = arrow(angle=20,type="closed",ends="both",length=unit(3,"mm")))
+}
+
+plot_cdf <- function(plot_data, theta) {
+  # Plot cdf
+  ggplot(plot_data, aes(x=x)) + geom_line(aes(y=cdf, color=dist)) +
+    geom_segment(data=theta, aes(x = sd_fr, y = 0, xend = sd_to, yend = 0, colour=dist), arrow = arrow(angle=20,type="closed",ends="both",length=unit(3,"mm")))
+}
+
+# Produce the theta space
+x=c(0:30)
+theta <- data.frame(min=c(10, 10, 10), max=c(15, 20, 25))
+theta <- ddply(theta, .(min, max), transform, mean=(min+max)/2, sd=sqrt((max-min)^2/12), skewness=0, kurtosis=-6/5)
+theta <- ddply(theta, .(min, max), transform, sd_fr=mean-sd, sd_to=mean+sd, dist=paste0("min=",min," max=",max))
+
+# Produce the data for ploting
+pdf <- NULL
+cdf <- NULL
+for(i in 1:nrow(theta)) {
+  pdf <- c(pdf, dunif(x, theta[i,]$min, theta[i,]$max))
+  cdf <- c(cdf, punif(x, theta[i,]$min, theta[i,]$max))
+}
+plot_data <- data.frame(x=rep(x, 3), pdf=pdf, cdf=cdf, dist=rep(theta$dist, each=31))
+
+# Call function to plot
+plot_pmf(plot_data, theta)
+plot_cdf(plot_data, theta)
+
+# Uncomment the following code to verify the mean/var/skew/kurtosis equation
+#theta
+#mean_func <- function(x, min=theta[1,]$min, max=theta[1,]$max){ x*dunif(x, min=min, max=max) }
+#(mean = integrate(mean_func, lower=-Inf, upper=Inf))
+#var_func <- function(x, mean=12.5, min=theta[1,]$min, max=theta[1,]$max){ (x-mean)^2*dunif(x, min=min, max=max) }
+#var = integrate(var_func, lower=-Inf, upper=Inf)
+#(sd = sqrt(var$value))
+#skw_func <- function(x, mean=12.5, min=theta[1,]$min, max=theta[1,]$max){ (x-mean)^3*dunif(x, min=min, max=max) }
+#(skw = integrate(skw_func, lower=-Inf, upper=Inf)$value/sd^3)
+#kts_func <- function(x, mean=12.5, min=theta[1,]$min, max=theta[1,]$max){ (x-mean)^4*dunif(x, min=min, max=max) }
+#(kts = integrate(kts_func, lower=-Inf, upper=Inf)$value/sd^4-3) # I don't know why kurtosis is different
+```
+
+
+
 
