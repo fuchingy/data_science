@@ -1,0 +1,275 @@
+---
+title: "Regression Model"
+author: "Fu-Ching Yang"
+date: "2016/10/20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Regression model使用一組rv (predictor)來預測一個rv (outcome)．在univariate中則是限縮用一個rv來預測一個rv．在這筆記中，predictor都用X代表，outcome都用Y代表．
+
+Regression model假設的數學公式如下．$\beta_0$代表intercept．$\beta_1$代表slope．
+
+$\epsilon_{i}$是residual，代表沒被regression model解釋的剩餘部分．有些時候可以理解為誤差值．
+
+$$
+Y_i = \beta_0 + \beta_1 X_i + \epsilon_{i}
+$$
+
+一些性質表列如下：
+
+* $\epsilon_{i}$假設呈現iid $N(0, \sigma^2)$分布．
+* $E[Y ~|~ X = x] = \beta_0 + \beta_1 x$
+* $Var(Y ~|~ X = x) = \sigma^2$
+* $E[e_i] = 0$.
+* 如果intercept包含的話，$\sum_{i=1}^n e_i = 0$
+* If a regressor variable, $X_i$, is included in the model $\sum_{i=1}^n e_i X_i = 0$. 
+
+# Fit model
+
+Regression model求$\beta_0$和$\beta_1$的方式，就是設法使Y跟預測的值有最小的差距，也就是最小化以下的公式．Least square error (MSE)講的就是這個．
+
+$$
+\sum_{i=1}^n \{Y_i - (\beta_0 + \beta_1 X_i)\}^2
+$$
+
+透過數學推導，$\beta_0$和$\beta_1$的估計式可以得到如以下這樣：
+
+$$\hat \beta_1 = Cor(Y, X) \frac{Sd(Y)}{Sd(X)} ~~~ \hat \beta_0 = \bar Y - \hat \beta_1 \bar X$$
+
+實務上，其實透過R的lm()都可以自動算出．以下我們使用mtcars來示範．
+
+首先，取得mtcars．藉由str()我們得知mtcars有很多rv，我們使用wt當predictor來預測mpg (outcome)．
+
+```{r}
+data(mtcars)
+str(mtcars)
+```
+
+透過scatter plot，我們可以看出wt和mpg的確存在某種關係．
+
+```{r}
+library(ggplot2)
+g = ggplot(mtcars, aes(x = wt, y = mpg))
+g = g + xlab("wt")
+g = g + ylab("mpg")
+g = g + geom_point(size = 2, colour = "blue", alpha=0.5)
+g
+```
+
+我們直接套用lm()做regression model．把結果存在fit中．用summary(fit)看結果．
+
+其中37.2851就是$\beta_0$ (intercept)，而-5.3445就是$\beta_1$ (slope)．
+
+```{r}
+fit <- lm(mpg ~ wt, mtcars)
+summary(fit)
+```
+
+如果依得到的$\beta_0$和$\beta_1$我們可以畫一條regression line，幸福的是我們可以不用自己畫這條線．在R中，ggplot2不但能畫scatter plot，還內建regression model能畫出regression line．如以下這樣，其中黑線就是regression line．
+
+```{r}
+g = ggplot(mtcars, aes(x = wt, y = mpg))
+g = g + xlab("wt")
+g = g + ylab("mpg")
+g = g + geom_point(size = 2, colour = "blue", alpha=0.5)
+g = g + geom_smooth(method = "lm", colour = "black")
+g
+```
+
+最後，我們先把coefficient存下來便於之後使用．coef()函式也能用，但只有存放參數，沒有standard error等等資訊．
+
+```{r}
+sumCoef <- summary(fit)$coefficients # Get coefficent
+sumCoef
+# coef(fit)
+```
+
+# $R^2$ and residual variation
+
+## $R^2$
+
+由上圖看見，regression line解釋了部分mpg的variation，這稱為regression variation．但還有部分的variation沒被解釋到，就是residual的variation．
+
+根據variance decomposition，Y的total variantion可以寫成是residual variantion加上regression variantion．
+
+$$
+\sum_{i=1}^n (Y_i - \bar Y)^2 
+= \sum_{i=1}^n (Y_i - \hat Y_i)^2 + \sum_{i=1}^n  (\hat Y_i - \bar Y)^2 
+$$
+
+而定義上的$R^2$就是regression variance除以total variance，有點像是regression model能解釋多大部分的variance的概念．這$R^2$就是報告中的Multiple R-squared，值為0.7528．
+
+$$
+R^2 = \frac{\sum_{i=1}^n  (\hat Y_i - \bar Y)^2}{\sum_{i=1}^n (Y_i - \bar Y)^2}
+$$
+
+```{r}
+summary(fit)$r.squared
+```
+
+知道$R^2$的意義後，我們也可以自己算．
+
+```{r}
+# Mean of mpg
+mu <- mean(mtcars$mpg)
+
+# Total variable of mpg
+sTot <- sum((mtcars$mpg - mu)^2)
+
+# Residual variation of mpg
+sRes <- deviance(fit)
+
+# R2
+1-sRes/sTot # by definition
+
+# cor^2 = R2
+cor(mtcars$mpg, mtcars$wt)^2
+```
+
+關於$R^2$的性質：
+
+* $0 \leq R^2 \leq 1$
+* $R^2$是sample correlation開根號
+* 單看$R^2$來判斷model準確性可能會有誤判狀況
+
+## Residual variation
+
+Residual variation既然是剩餘沒被model解釋的variation，有時候，藉由畫出residual可以幫助我們了解其variation是否存在某種規律的性質model沒抓取到的．
+
+我們使用resid()來取得fit中residual的資料(fit$residuals也可以)，接著用ggplot畫圖．下圖顯示residual的分佈是無規律性的，表示model規律的部分應該抓得還不錯．
+
+```{r}
+g = ggplot(mtcars, aes(x = wt, y = resid(fit)))
+g = g + xlab("wt")
+g = g + ylab("mpg")
+g = g + geom_point(size = 2, colour = "blue", alpha=0.5)
+g = g + geom_smooth(method = "lm", colour = "black")
+g
+```
+
+了解residual的變動範圍也有助於了解資料，其變動範圍，以$\sigma$代表，就是報告中的Residual standard error，值為3.046． (其分佈是T distribution)
+
+利用數學公式也可以自己算出來．
+
+```{r}
+n <- length(mtcars$mpg)
+# Estimated residual standard deviation can be calculated in 3 ways
+summary(fit)$sigma            # by lm$sigma
+sqrt(sum(resid(fit)^2)/(n-2)) # by definition
+sqrt(deviance(fit)/(n-2))     # by lm
+```
+
+在summary中，他也幫我們算出residual的最大值、最小值、中位數等資訊．例如以下，我們用原始residual來算最小值，這跟報告的是一樣的．
+
+```{r}
+min(residuals(fit))
+```
+
+# Prediction
+
+## Without interval
+
+有model後，我們就可以用來預測了．我們假設要預測當wt為平均值時，mpg應該是多少．
+
+為了方便起見，我們把wt的預測值算出，存在wt.pred．然後直接使用R的predict()函式來預測，這跟用$Y_i = \beta_0 + \beta_1 X_i$計算是一樣的．
+
+結果顯示mpg的預測值應該是20.09062．
+
+```{r}
+wt.pred <- mean(mtcars$wt)
+(mpg.outcome <- predict(fit, data.frame(wt=wt.pred)))
+```
+
+我們也可以根據公式$Y=\beta_0+\beta_1X$以手動計算，如下：
+
+```{r}
+intercept <- sumCoef[1,1]
+slope <- sumCoef[2,1]
+intercept + slope * wt.pred
+```
+
+將其畫在圖上，是落在regression line上的一個點．
+
+```{r}
+g = ggplot(mtcars, aes(x = wt, y = mpg))
+g = g + xlab("wt")
+g = g + ylab("mpg")
+g = g + geom_point(size = 2, colour = "blue", alpha=0.5)
+g = g + geom_point(aes(x=wt.pred, y=mpg.outcome), size = 2, colour = "red", alpha=0.5)
+g = g + geom_smooth(method = "lm", colour = "black")
+g
+```
+
+## With interval
+
+事實上，因為$\beta_0$ (intercept)和$\beta_1$ (slope)都因為實驗誤差的關係會有variantion，所以以這model預測的值也會有variantion．
+
+因此，好的統計學家除了給預測值之外，預測時也要把variation考慮進去，搭配其sampling distribution形成confidence interval．
+
+### Variation of $\beta_0$ $\beta_1$
+
+$\beta_0$和$\beta_1$估計值的variance計算如下：(實務上，$\sigma$用估計值取代)
+
+$$\sigma_{\hat \beta_1}^2 = Var(\hat \beta_1) = \sigma^2 / \sum_{i=1}^n (X_i - \bar X)^2$$
+
+$$\sigma_{\hat \beta_0}^2 = Var(\hat \beta_0)  = \left(\frac{1}{n} + \frac{\bar X^2}{\sum_{i=1}^n (X_i - \bar X)^2 }\right)\sigma^2$$
+
+它們的分佈如以下都是T distribution，degree of freedom是$n-2$
+
+$$
+\frac{\hat \beta_j - \beta_j}{\hat \sigma_{\hat \beta_j}}
+$$
+
+預測範圍有regression line interval和prediction confidence interval兩種．計算方式分別如下：
+
+* Prediction Line at $x_0$ se, $\hat \sigma\sqrt{\frac{1}{n} +  \frac{(x_0 - \bar X)^2}{\sum_{i=1}^n (X_i - \bar X)^2}}$
+* Prediction interval se at $x_0$, $\hat \sigma\sqrt{1 + \frac{1}{n} + \frac{(x_0 - \bar X)^2}{\sum_{i=1}^n (X_i - \bar X)^2}}$
+
+### R practice
+
+我們以先前的例子計算以wt.pred當predictor，假設95%的信任區間，mpg預測值的範圍應該是如何?
+
+要做這件事，其實R的predict()函式只要加上interval=("confidence")就可以了．我們可以發現95% confidence interval是[18.99, 21.19]．
+
+```{r}
+predict(fit, data.frame(wt=mean(mtcars$wt)), interval=("confidence"), level=0.95)
+```
+
+除了confidence interval以外，還有一個prediction interval，用以下方法計算．
+
+```{r}
+predict(fit, data.frame(wt=mean(mtcars$wt)), interval=("prediction"), level=0.95)
+```
+
+我們同樣利用以下公式手動計算，如下：
+
+```{r}
+ssx <- sum((mtcars$wt - mean(mtcars$wt))^2)
+sigma <- summary(fit)$sigma
+se1 <- sigma*sqrt(1/length(mtcars$mpg)+(wt.pred-mean(mtcars$wt))^2/ssx)   # standard error of confidence interval
+se2 <- sigma*sqrt(1+1/length(mtcars$mpg)+(wt.pred-mean(mtcars$wt))^2/ssx) # standard error of prediction interval
+mpg.outcome + c(-1,1) * se1 * qt(0.975, df=fit$df) # confidence interval
+mpg.outcome + c(-1,1) * se2 * qt(0.975, df=fit$df) # prediction interval
+```
+
+其實這confidence interval就是先前scatter plot中那陰影的部分，ggplot已經考慮進去了．
+
+### Unit scaling
+
+有了model後，我們也可以探討predictor和outcome的連動關係．例如原本wt的單位是1000lbs．如果我們將wt的單位定義為2000lbs，那麼wt每改變2000lbs，mpg的95% confidence的變動範圍會是多少？
+
+這其實就只是在算斜率的變動範圍，然後乘上2而已．
+
+```{r}
+(sumCoef[2,1] + c(-1,1) * sumCoef[2,2] * qt(0.975, df=fit$df)) * 2
+```
+
+藉由regression model的linear特性，我們也可以探討單位變化關係．例如如果原本predictor的單位是公分，當換成公尺之後，regression line的斜率會增加100倍．
+
+
