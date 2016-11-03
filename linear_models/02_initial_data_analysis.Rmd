@@ -1,0 +1,160 @@
+---
+title: "Initial Data Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+> Reading: Faraway (2005), section 1.2
+
+This is a critical step that should always be performed. You should
+
+1. **understand the background** of a dataset and what each variables in the dataset represent.
+2. **calculate some descriptive statistics**, such as means, standard deviation, maximum and minimum, correlation, and whatever else is appropriate.
+3. **draw graphical summaries**, such as histograms, box plots, density plots, scatter plots, and many more.
+
+In these numerical and graphical summaries, you can look for
+
+* outliers,
+* data-entry errors,
+* skewed or unusual distributions and structure,
+
+and check
+
+* whether the data are distributed according to prior expectations and
+* whether some assumptions in the models that will be conducted in further data analyses are violated.
+
+Here is a data set from a study conducted by the National Institute of Diabetes and Digestive and Kidney Diseases on 768 adult female Pima Indians living near Phoenix. We start by reading the data into R.
+
+```{r}
+#pima <- read.table("linear_models/pima.data", header=T) # read the data into R
+pima <- read.table("pima.data", header=T) # read the data into R
+pima # take a look
+str(pima)
+```
+
+The variables represents:
+
+Variable | Description
+-------- | -------------------------
+pregnant | the number times pregnant
+glucose  | the plasma glucose concentration at 2 hours in an oral glucose tolerance test
+blood    | the diastolic blood pressure (mmHg)
+triceps  | the triceps skin fold thickness (mm)
+insulin  | the 2-hour serum insulin (mu U/ml)
+bmi      | the body mass index (weight in kg/(height in m2))
+pedigree | the diabetes pedigree function
+age      | the age (years)
+test     | whether the patient showed signs of diabetes (0=negative, 1=positive)
+
+(Q: Are these variable quantitative or qualitative? If quantitative, continuous or discrete? If qualitative, whether order exists between levels)
+
+At this stage, we are looking for anything unusual or unexpected, say indication of a data-entry error, or anything that show inconsistency with the pre-knowledge about the data. Let's first calculate some numerical summaries.
+
+```{r}
+summary(pima)  # some numerical summaries 
+```
+
+Take a close look at the minimum and maximum values of each variable. What have you found?
+
+It is weird that blood pressure equals zero (also check variables glucose, triceps, insulin, bmi). Let's check their sorted values to find out how many 0's in the variable blood.
+
+```{r}
+sort(pima$blood)  # sort the values of this variable from small to large
+```
+
+It seems likely that the zero has been used as a missing value code. In a real investigation, one would likely be able to question what really happened and if missing, whether there exists a systematic missing mechanism.
+
+R use "NA" as the missing value code. Let's set all zero values of the variables to NA.
+
+```{r}
+pima$blood[pima$blood == 0] <- NA # set zero values in the variable blood to "NA", where "==" means "equal" in R 
+pima$glucose[pima$glucose == 0] <- NA # set zero values in the variable glucose to "NA"
+pima$triceps[pima$triceps == 0] <- NA # set zero values in the variable triceps to "NA"
+pima$insulin[pima$insulin == 0] <- NA # set zero values in the variable insulin to "NA"
+pima$bmi[pima$bmi == 0] <- NA # set zero values in the variable bmi to "NA"
+```
+
+The variable test is a qualitative variable, whose numerical coding is meaningless. In R, a qualitative variable should be assigned as a "factor" so that R can handle it in an appropriate way.
+
+```{r}
+pima$test <- factor(pima$test) # assign the variable test as a factor in R
+summary(pima$test) # take a look
+```
+
+It is even better to use descriptive labels:
+
+```{r}
+levels(pima$test) # check how variable test is coded now
+levels(pima$test) <- c("negative", "positive") # assign descriptive labels to variable test
+levels(pima$test) # check how variable test is coded now
+```
+
+Now, let's take a look of the summary of the dataset again.
+
+```{r}
+summary(pima) # take a look
+```
+
+Try to compare it with the previous summary and see how the results are different. The 0 is not the minimal value any more.
+
+Now we can do some plots to examine the distribution of variables. Use the variable blood as an example.
+
+```{r}
+hist(pima$blood) # draw histogram of variable blood
+```
+
+From the plot,
+
+* We see a bell-shaped distribution for the blood pressures centered around 70.
+* Notice that histogram plot may obscure some features of the data because its construction requires some inputs specified by the user, such as the spacing on the horizontal axis.
+* For this reason, a smoothed version of the histogram might be preferred.
+
+```{r}
+plot(density(pima$blood, na.rm=TRUE))  # the function "density" computes kernel density estimates, "na.rm=True" option removes missing values.
+```
+
+We see the plot avoids the distracting blocks in the histogram.
+
+Another alternative is to plot the sorted data against its index.
+
+```{r}
+plot(sort(pima$blood), pch=".") 
+```
+
+One advantage of this plot is that we can see all the cases individually, which may offer some information about outliers in addition to the distribution of data.
+
+We can draw the three plots in a window for a better comperison:
+
+```{r}
+par(mfrow = c(1, 3))  # the graphical parameter "mfrow" is a 2-dim vectors in which the first number assigns the number of rows, the second the number of columns; try the command "help(par)" to get more information on graphical parameters
+hist(pima$blood); plot(density(pima$blood, na.rm=TRUE)); plot(sort(pima$blood), pch=".")
+par(mfrow = c(1, 1))  # set the parameter back to itsoriginal setting
+```
+
+Now, note a couple of bi-variate plots.
+
+```{r}
+par(mfrow = c(1, 2))
+plot(pedigree ~ blood, pima)  # the command draws a scatter plot because the variable blood is a quantitative variable
+plot(pedigree ~ test, pima)  # it draws a side-by-side box plot because the variable test is a qualitative variable
+par(mfrow = c(1,1))
+```
+
+Notice that
+
+* the scatter plot (left panel) shows the relationship between two quantitative variables,
+* the side-by-side boxplot (right panel) is suitable for showing how the distribution of a quantitative variable is influenced by a qualitative variable.
+
+Also useful is a scatter plot matrix.
+
+```{r}
+pairs(pima)  # produce a matrix of scatter plots
+```
+
+What information can you find from these scatter plots? Are there some plots that particularly catch you attention?
+
+triceps and bmi have high correlation.
+

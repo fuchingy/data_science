@@ -1,0 +1,109 @@
+---
+title: "Introduction to R"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+> Reading: Faraway (2005), Appendixes A and B
+
+```{r}　
+2+3  # R can be used as a simple calculator
+exp(1)  # All the usual calculator functions are available
+pnorm(1.645)  # the normal probability function
+```
+　
+The assignment operator is "<-"
+
+```{r}
+x <- 2  # assign the value 2 to x
+y <- 3  # y is 3
+z <- x+y  # assign the sum to z
+z  # look at the result
+```
+
+Vector and matrix valued variables are also possible.
+
+The c(), cbind() and rbind() functions are useful for building these up.
+
+```{r}
+x <- c(1,9,7,3)  # x is a length 4 vector
+x  # take a look
+y <- 1:4  # ":" is useful for assigning a sequence
+y  # take a look
+z <- x+y # vector arithmetic works as expected
+z # take a look
+xm <- cbind(x,y,z) # make a matrix by binding x, y, z together column-wise
+xm # take a look
+t(xm) # the transpose of xm
+rbind(x, y, z) # make a matrix by binding x, y, z together row-wise
+```
+　
+Now let's look at getting some simple statistics:
+
+```{r}
+x <- rnorm(50) # generat 50 standard normal random numbers
+mean(x) # the mean
+var(x) # the variance
+summary(x) # 5 number summary plus the mean
+stem(x) # a stemplot of x
+y <- rnorm(50) # more random numbers
+cor(x,y) # the correlation of x and y
+```
+
+Now, let's do some nice graphics:
+
+```{r}
+hist(x) # a histogram of x
+plot(x,y) # a simple scatter plot
+plot(x,y,pch="+",xlab="The X axis",main="My plot") # add some more options to the plot
+```
+
+To find out more online use the "help()" command:
+
+```{r}
+help(cbind) # If you know the command you want help for
+```
+　
+Lets see how we enter data into R.  Here is a data set for test. You can save it as a text file to a directory, say "c:/mydata/", with a file name, say "gala.data". 
+
+```{r}
+gala <- read.table("gala.data") # read the data into R
+```
+
+Or, you can change the working directory to "c:/mydata" (do this by choosing "檔案"->"變更現行目錄", and then inputting the directory name). And now you can simply read the data into R by:
+
+```{r}
+gala # take a look
+```
+
+R stores whole datasets in dataframes. It's a convenient way of keeping all the variables together.
+
+```{r}
+dim(gala) # check the dimension of the data
+```
+
+You can select a variable from the data by:
+
+```{r}
+gala$Species # pick out a particular variable
+gala$Sp # unique abbreviations work
+attach(gala) # makes the prepending of gala unnecessary - see next line
+Species 
+```
+
+You can select a subset of the data by:
+
+```{r}
+gala[2,] # the second row
+gala[,3] # the third column
+gala[2,3] # the (2,3) element
+gala[c(1,2,4), ] # the first, second, and fourth rows
+gala[3:6,] # the third through sixth rows
+gala[,-c(1,2)] # "-" indicates "everything but", this keeps all data except the first two columns
+gala[gala$Sp > 300,] # select those cases whose Species are greater than 300
+```
+　
+More details on R can be found: http://www.math.montana.edu/Rweb/Rnotes/R.html.

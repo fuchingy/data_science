@@ -1,0 +1,225 @@
+---
+title: "Parameter Estimation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+> Reading: Faraway (2005), section 2.8
+
+　
+Here is a data set concerning the number of species of tortoise on the various Galapagos Islands. There are 30 cases (Islands) and 7 variables in the data set. We start by reading the data into R.
+
+```{r}
+#gala <- read.table("project_dev/data_science/linear_models/gala.data") # read the data into R
+gala <- read.table("gala.data") # read the data into R
+gala # take a look
+```
+
+The variables are
+
+Variable  | Description
+--------- | --------------------------------------------------------
+Species   | the number of species of tortoise found on the island
+Endemics  | the number of endemic species
+Area      | the area of the island ($km^2$)
+Elevation | the highest elevation of the island (m)
+Nearest   | the distance from the nearest island (km)
+Scruz     | the distance from Santa Cruz island (km)
+Adjacent  | the area of the adjacent island ($km^2$)
+
+
+In this dataset,
+
+* Some missing values are filled in for simplicity.
+* Q: Are these variable quantitative or qualitative? If quantitative, continuous or discrete?
+
+```{r}
+str(gala) # take a look
+```
+
+Now fit a model. Let us start with a simple model, in which
+
+* the variable "Species" is treated as the response (Q: Is it reasonable to regard Species as a continuous variable?) and
+* the rest variables except "Endemics" as the predictors.
+* The model can be expressed as
+
+$$
+Species_i = \beta_0 + \beta_1 Area_i + \beta_2 Elevation_i + \beta_3 Nearest_i + \beta_4 Scruz_i + \beta_5 Adjacent_i ~~~~ i=1,2,...,30
+$$
+
+The command to fit a linear model in R is:
+
+```{r}
+gfit <- lm(Species ~ Area + Elevation + Nearest + Scruz + Adjacent, data=gala) # "lm" is the command in R to fit a linear model. Use "help(lm)" to understand the details of the command. The option "data=" specifies the dataset that will be used. Also, use "help(formula)" to learn how to express a model in R.
+summary(gfit) # all the usual regression stuff
+```
+
+Notice that
+
+* There are many quantities (statistics) and many information in the output.
+* Q: What quantities have caught your attention?
+* For different datasets, you might find their most important/useful information existing in different statistics.
+* Q: For this dataset, which statistics/quantities are particularly important?
+
+The default of "summay(lm.object)" does not print the correlation matrix.
+
+```{r}
+summary(gfit, cor=T) # with the option "cor=T", the output will contain the correlation matrix of the estimated parameters
+options(digits=3) # the option "digits" controls the number of digits to print
+summary(gfit, cor=T)$cor # take a look of the correlation matrix of β's estimators
+```
+
+Notice that
+
+* the correlation matrix is a symmetric matrix
+* its diagonals are 1's
+* Q: How to read these numbers?
+    + For example, cor( $\hat{\beta_1}$, $\hat{\beta_2}$)=-0.8014 shows that the estimators of Area and Elevation effects are highly negatively correlated. They have strong collinearity.
+    + On the other hand, cor($\hat{\beta_2}$,$\hat{\beta_4}$)=0.099 tells us the estimators of Elevation and Scruz effects have much weaker correlation.
+
+The covariance matrix of $\beta$ is $(X^TX)^{-1}\sigma^2$, which can be calculated as follows.
+
+```{r}
+summary(gfit)$cov * (summary(gfit)$sigma^2) # the covariance matrix of the β's estimators, the command "summary(gfit)$cov" returns (XTX)-1
+```
+
+Or, we can calculate the covariance matrix manually as follows.
+```{r}
+x <- model.matrix(gfit)                     # the model matrix
+solve(t(x) %*% x) * (summary(gfit)$sigma^2) # (XTX)-1 * sigma
+```
+
+Notice that in the covariance matrix
+
+* The values in the diagonal are the estimated variances of $\hat{\beta}$. Compare it with the Std. Error in the lm output. Q: What is the relationship between them?
+    + Since $se(\hat{\beta_i})=\sqrt{(X^TX)^{-1}_{ii}}\hat{\sigma}$, the standard error is the square root of variance.
+    + E.g., sqrt(366.8833) = 19.2.
+
+* Q: How are the covariance matrix related to the correlation matrix? In other words, how to obtain the correlation matrix from the covariance matrix given above?
+    + The correlation is the covariance divided by the two standard errors, which are from variance's square root
+    + $\frac{(X^TX)^{-1}_{ij}\sigma^2}{\sqrt{(X^TX)^{-1}_{ii}\sigma^2}\sqrt{(X^TX)^{-1}_{jj}\sigma^2}}$
+    + E.g., -0.000964 / (sqrt(0.000503) * sqrt(0.002880))= -0.801
+
+Let us now examine the correlation between the columns of X.
+
+```{r}
+cor(model.matrix(gfit)) # the command "model.matrix" returns the model matrix X, which in this case is exactly the matrix formed by the data of the five predictor variables themselves plus the constant vector. This output shows the correlation between the columns of X.
+```
+
+Notice that
+
+* this correlation matrix is related to $X^TX$, rather than the $(X^TX)-1$ in the correlation matrix of $\hat{\beta}$.
+* Check how different it is from the correlation matrix of $\hat{\beta}$. Q: Can you identify some relationship between the two correlation matrices?
+    + When the correlation of model matrix is higher, the correlation of beta is higher, but with negative sign.
+    + For example, Area and Elevation has 0.7537 correlation of model matrix and -0.8014 correlation of beta.
+* Q: Why do we get the NA's in the output?
+    + It is because intercept is 1 vector, whose variance is 0.
+
+```{r}
+cov(model.matrix(gfit)) # the covariances between the five variables.
+```
+
+* Check how different it is from the covariance matrix of the estimated parameters.
+    + The diagonal part (variance) is no longer 1.
+    + The covariance with intercept is 0, since intercept's variance is 0.
+
+
+For practice purpose, let us also construct these quantities directly --- we define Y, X, (XTX)-1, %*% denotes matrix multiplication, "t()" makes the transpose, and "solve()" computes the inverse.
+
+```{r}
+y <- gala$Species # the response
+rep(1,30) # make a vector of ones
+x <- cbind(rep(1,30), gala[,-c(1,2)]) # bind a column of ones to all except the first two columns of the data from gala
+x <- as.matrix(x) # force x from being a data frame to a matrix x
+xtxi <- solve(t(x) %*% x) # compute (XTX)-1
+xtxi # it is the same as the output obtained from the command "summary(gfit)$cov"
+```
+
+$\hat{\beta}$, $\hat{Y}$, $\hat{\epsilon}$ may all be computed directly or extracted from the linear model object gfit. We do it both ways here --- check whether the results match.
+
+```{r}
+beta <- xtxi %*% t(x) %*% y # the β-hat
+beta 
+```
+
+However,
+
+* it is a bad way to compute $\hat{\beta}$
+* it is inefficient and can be very inaccurate when the predictors are strongly correlated
+* An alternative is to directly solve the normal equation $X^TX\beta=X^TY$.
+
+```{r}
+solve(t(x)%*%x, t(x)%*%y) # solve the normal equation
+```
+
+We can extract the regression quantities we need from the lm object.
+
+```{r}
+names(gfit) # the "names()" command is the way to see the components of an R object
+gfits <- summary(gfit)
+names(gfits) # more regression quantities in summary of lm object.
+deviance(gfit) # the "deviance" command returns RSS for a regression fitted model.
+```
+
+Compare the quantity and the Residual standard error in the lm output.
+
+* Q: how to obtain the residual standard error from the RSS (Residual Sum of Square)? Notice that $\hat{\sigma}=\sqrt{\frac{RSS}{n-p}}$.
+
+```{r}
+gfit$coef # get β-hat from the fitted model gfit
+yhat <- x %*% beta # y-hat=X(β-hat)
+cbind(yhat, gfit$fitted) # compare if they are identical
+res <- y - yhat # the residuals
+cbind(res, gfit$resid) # compare if they are identical
+```
+
+Notice that
+
+* the residuals and the fitted values are orthogonal.
+    + Residuals is the vector vertical to $\hat{Y}$, which is the projection of Y to the plain spanned by model matrix.
+
+```{r}
+sum(res*yhat)  # their inner product = 0
+```
+
+* actually, the residual vector is orthogonal to any columns of X (therefore, orthogonal to any linear combinations of the columns of X
+
+```{r}
+t(x) %*% res # XT(ε-hat)
+```
+
+We now compute the residual sum of squares (RSS), $\hat{\sigma}$, standard error of $\hat{\beta}$, $R^2$, and the correlation matrix for $\hat{\beta}$. Verify that the results agree with the output from before.
+
+```{r}
+sum(res*res) # the RSS
+gfit$df # the degrees of freedom, it = 30-6, why?
+sighat <- sqrt(sum(res*res)/gfit$df) # calculate σ-hat
+sighat # take a look
+diag(xtxi) # the "diag" command extract the diagonal of a matrix. The output is the diagonal entries of (XTX)-1
+sqrt(diag(xtxi))*sighat  # Q: what's this?
+summary(gfit)$coef[,2]  # compare with the previous outputs
+mean(y) # calculate the mean of y
+sum((y-mean(y))^2) # the total sum of squares
+1 - sum(res*res) / sum((y-mean(y))^2) # the R2
+var(yhat)/var(y) # Q: why does it equal R2?
+cor(y,yhat)^2 # Q: why does it equal R2?
+```
+
+Let's calculate the correlation matrix of $\hat{\beta}$.
+
+```{r}
+z <- sqrt(diag(xtxi)) 
+xtxi / z %o% z # the correlation matrix, where %o% means outerproduct zzT
+```
+
+Now we make a prediction for the number of species on an island with predictor values: Area=0.08, Elevation=93, Nearest=6.0, Scruz=12.0, and Adjacent=0.34.
+
+```{r}
+xp <- c(1, 0.08, 93, 6.0, 12.0, 0.34) # don't forget the initial one
+sum(xp*beta) # the predicted number of species
+```
+
+
