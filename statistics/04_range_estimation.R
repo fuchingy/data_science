@@ -27,7 +27,7 @@ mean.pvtq <- function(x, mean) {
 # distribution
 n <- 50
 data <- NULL
-for( mean in c(50, 70, 90, 110, 130) ) {
+for( mean in c(50, 51, 52, 53, 54) ) {
     pvtq <- NULL
     for( i in c(1:1000)){
         x <- rnorm(n, mean=mean, sd=12)
@@ -36,7 +36,7 @@ for( mean in c(50, 70, 90, 110, 130) ) {
     this_data <- data.frame(mean=mean, pvtq=pvtq)
     data <- rbind(data, this_data)
 }
-data$req_x <- data$pvtq / data$mean
+data$req_x <- data$pvtq + data$mean
 head(data)
 ddply(data, ~mean, summarize, count=length(pvtq))
 
