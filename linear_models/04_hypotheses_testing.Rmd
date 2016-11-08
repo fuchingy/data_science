@@ -1,0 +1,324 @@
+---
+title: "Hypotheses Testing"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+> Reading: Faraway(2005), 3.2
+
+Here is a data set that is built-in in Splus, called "saving.x". Details about the data can be found in Splus by the command "help(saving.x)", which returns the following results:
+
+Savings Rates for Countries
+
+SUMMARY:
+
+The saving.x data set is originally from unpublished data of Arlie Sterling. It is a matrix with 50 rows representing countries and 5 columns representing variables. The data contain average saving rates over the time period of 1960-1970; the data are averaged to remove business cycle or other short-term fluctuations. Income is per-capita disposable income in U.S. dollars, growth is the percent rate of change in per capita disposable income, and savings rate is aggregate personal saving divided by disposable income.
+
+SOURCE:
+
+Belsley, D.A., Kuh, E., and Welsch, R.E. (1980). Regression Diagnostics: Identifying Influential Data and Sources of Collinearity. New York: John Wiley and Sons, Inc.
+
+Let us read the data into R:
+
+```{r}
+saving.x <- read.table("saving.x", header=T) # the option "header" is a logical value indicating whether the file contains the names of the variables as its first line. It is set to "TRUE" if and only if the first row contains one fewer field than the number of columns.
+head(saving.x) # take a look of the data
+```
+
+The dataset has 50 observations and 5 variables. The variables are:
+
+Variable  | Description
+--------- | --------------------------------------------------------
+Pop15     | the percentage population under 15
+Pop75     | the percentage population over 75
+Disp      | per-capita disposable income in US dollars (可支配收入)
+Growth    | the percent rate of change in per capita disposable income (收入增加比率)
+Savings   | aggregate personal saving divided by disposable income (儲蓄)
+
+在這裡，Pop15, Pop75, Growth是百分比數據．要注意，百分比數據要很小心，因為有下界和上界，會使數據分佈變得不像Normal．
+
+Let's assign the variables:
+
+```{r}
+p15 <- saving.x[,1] # save the 1st column as p15
+p75 <- saving.x[,2] # save the 2nd column as p75
+inc <- saving.x[,3] # save the 3rd column as inc
+gro <- saving.x[,4] # save the 4th column as gro
+sav <- saving.x[,5] # save the 5th column as sav
+```
+
+Now, let us fit a simple model, with the variable Savings as the response and the rest variables as predictors, i.e.
+
+$$sav_i = \beta_0 + \beta_{p15} p15_i + \beta_{p75} p75_i + \beta_{inc} inc_i + \beta_{gro} gro_i + \epsilon_i ~~~,~~~ i=1, 2, ..., 50.$$
+
+In the following, we demonstrate how the t-statistics and overall F-test can be obtained from R, or by doing the calculations directly.
+
+```{r}
+g <- lm(sav ~ p15 + p75 + inc + gro) # fit the model with sav as response and the rest as predictors
+summary(g) # make a note of the p-values for the overall F-test and the t-test H0: bp15=0
+```
+
+F-statistic就是overall F，各項數學式如下：
+
+其假設的H0是所有參數皆為0，Ha是至少有一個參數不為0．這用來檢定對Y的解釋好不好．
+
+$$
+\begin{align}
+\Omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, ~~~ & dim(\Omega)=5, ~~~ & df_\Omega=50-5=45 \\
+\omega: sav & = \beta_0 + \epsilon, ~~~ & dim(\omega)=1, ~~~ & df_\omega=49
+\end{align}
+$$
+$$
+\begin{align}
+& H_0: \beta_{p15} = \beta_{p75} = \beta_{inc} = \beta_{gro} = 0 & H_1: \mbox{At least 1 of } \beta \mbox{ is not zero}\\
+& RSS_\Omega: \hat{\epsilon_\Omega}^T \hat{\epsilon_\Omega}=\sum_{i=1}^n(y_i-\hat{y_{i\Omega}})^2 & RSS_\omega= \sum_{i=1}^n(y_i-\hat{y})^2
+\end{align}
+$$
+
+$$F=\frac{(RSS_\omega-RSS_\Omega)/(df_\omega-df_\Omega)}{RSS_\Omega/df_\Omega}$$
+
+看overall F要注意，F如果變大，$R^2$也會變大．但樣大時，有可能F很大(extreme significant)，但$R^2$很小．這將造成每個參數值都很小，但對Y的解釋有顯著貢獻．
+
+(Q: There are many quantities and many information in the output. What have caught your attention? For different datasets, you might find their most important/useful information existing in different statistics. For this dataset, which statistics/quantities are particularly important?)
+
+Notice that
+
+* because the overall F-test ($H_0: \beta_{p15} = \beta_{p75} = \beta_{inc} = \beta_{gro} = 0$) has a small p-value, 0.0007902, the null hypothesis that none of the predictors are useful in explaining the response is rejected.
+    + 這裡的p-Value是0.0007902，指明很significant，這說出用這些變數來解釋Y是有一定效果的．
+* Q: Why the degrees of freedom for the overall F-test are 4 and 45?
+    + 在這因為有50個樣本，而有5個未知參數．
+    + 45就是50-5．這也就是residual的degree of freedom．
+    + 報告中的4是因為$df_\omega-df_\Omega$
+    
+* although the overall F-test is significant, the R2(=0.3385) is not very high. Only 33.85% of the variation in Savings is explained by the predictors.
+    + However, it is difficult to judge whether such an R2 is much lower than expectation when we don't have further background information about the data.
+    + $R^2$只有33.85%，看似Y沒有解釋很多．但$R^2$的解釋比率其實在各領域有所不同，很難說就是怎樣．
+    + Be aware of the relationship between R2 and the test statistics of the overall F-test
+    + $R^2=1-\frac{RSS_\Omega}{TSS_\omega}$
+    + $F=\frac{(RSS_\omega-RSS_\Omega)/(df_\omega-df_\Omega)}{RSS_\Omega/df_\Omega}$
+    + $R^2=\frac{F \frac{df_\omega-df_\Omega}{df_\Omega}}{1+F\frac{df_\omega-df_\Omega}{df_\Omega}}$
+    + $F=\frac{R^2}{1-R^2} * \frac{df_\Omega}{df_\omega-df_\Omega}$
+
+
+$$R^2=\frac{F \frac{4}{45}}{1 + F \frac{4}{45}}  ~~~~  F=\frac{R^2}{1-R^2}*\frac{45}{4}$$
+以下是實際計算．由此公式就可以估算，若要提高$R^2$，F statistic應該要如何改變．
+```{r}
+(0.3385/(1-0.3385))*(45/4) # calculate the F test statistic from R2
+(5.756*(4/45))/(1+5.756*(4/45)) # calculate R2 from the F test statistic
+```
+
+* t-value = Estimate/(Std. Error) (Q: Why?)
+    + 例如：p15的t-value為-3.189，剛好是Estimate (-0.4612)除以std. error (0.1446)．
+    + 這表示$\beta$跟0之間的距離，除以它的std error後有多大．
+* because the p-value of the t-test H0: $\beta_{p15}=0$ is very small, we can conclude that the null should be rejected. But, remember that
+    + the t-test of p15 is relative to the other predictors in the model, namely, p75, inc, gro, and
+        + 這數據正確的解讀方式是，當model中有其他3個變數來解釋Y的時候，加上p15這變數是有必要、有效果的．
+        + 而inc的p-value很大(0.7192)，這說出當p15, p75, gro已經在model中時，要加上inc來解釋是沒有必要的．
+    + it is not possible to look at the effect of p15 in isolation, i.e, simply stating the null as $H0: \beta_{p15}=0$ is insufficient because information about what other predictors are not included
+    + the result of the test may be different if the predictors change
+* Q: Is the significance for the intercept, i.e, $H0: \beta_{0}=0$, important?
+    + 這代表X全部為0的時候，Y的平均值．這常是顯著的，但一般來說解釋意義不大
+
+## Test of all the predictors
+
+Now, let's do the calculation directly. First, the overall F-statistic --- we will perform the test of H0 by hand.
+
+$$H_0: \beta_{p15} = \beta_{p75} = \beta_{inc} = \beta_{gro} = 0$$
+
+For the test,
+
+$$
+\begin{align}
+\Omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, ~~~ & dim(\Omega)=5, ~~~ & df_\Omega=45 \\
+\omega: sav & = \beta_0 + \epsilon, ~~~ & dim(\omega)=1, ~~~ & df_\omega=49
+\end{align}
+$$
+
+$$F=\frac{(RSS_\omega-RSS_\Omega)/(df_\omega-df_\Omega)}{RSS_\Omega/df_\Omega}$$
+
+```{r}
+ip <- function(x,y) sum(x*y) # write a function for inner product, use "help("function")" to find out how to write a self-defined function in R
+ip(g$res, g$res) # the RSS_Omega
+g$df # the degrees of freedom of RSSW, i.e., n-p
+ip(sav-mean(sav), sav-mean(sav)) # the RSS_omega, which is TSS in this case
+((983.6283-650.706)/4)/(650.706/45) # the overall F-statistics
+1-pf(5.755865, 4, 45) # the p-value of the overall F-test, the command "pf" returns the cdf value of an F distribution
+```
+
+A convenient way in R to calculate the F-statistics and its p-value is as follows:
+
+先fit $\omega$的model．
+
+```{r}
+g1 <- lm(sav~1) # fit the null model w
+summary(g1) # take a look
+```
+
+然後用專門比較linear model的函式anova()來比．
+
+Model 1就是$\omega$，Model 2就是$\Omega$ (intercept沒有被顯示)．
+
+$\omega$的residual的degress of freedom是49，因為有50個數據、1個intercept參數．
+
+Df=4代表Model 1和Model 2的degree of freedom差了4．
+
+Sum of Sq 332.92是$RSS_{model1}-RSS_{model2}$．
+
+F statistic是(332.92/4)/(650.71/45)．其後為此F statistic的p-Value．此p-Value跟先前報告的p-Value是一樣的．
+
+```{r}
+anova(g1, g) # compare the two models W and w, the command "anova" computes the analysis of variance (or deviance) tables for one or more fitted models. Use "help(anova)" to get more information.
+```
+
+Check if it agrees with the result of the overall F-test in the summary of g.
+
+In many textbooks, you can find the common format of ANOVA table as follows. From the above overall F-test, can you fill in its ANOVA table?
+
+
+Source     | Degree of Freedom    | Sum of Square               | Mean Square	     | F
+---------- | -------------------- | --------------------------- | ---------------- | ---------------------------------------
+Regression | p-1 (4)              | $SS_{reg}$ (332.92)         | $SS_{reg}/(p-1)$ | $F = \frac{SS_{reg}/(p-1)}{RSS/(n-p)}$
+Residual   | n-p (45)             | RSS (650.71)                | $RSS/(n-p)$      | (5.7559)
+Total      | n-1=(p-1)+(n-p) (49) | $TSS=SS_{reg}+RSS$ (983.63) |                  |
+
+
+## Testing just one predictor
+
+Now, let's do the t-test, $H0: \beta_{p15}=0$, by hand. For the test,
+
+$$
+\begin{align}
+\Omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, & dim(\Omega)=5, ~~~ & df_\Omega=45 \\
+\omega: sav & = \beta_0 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, & dim(\omega)=4, ~~~ & df_\omega=46
+\end{align}
+$$
+
+```{r}
+g2 <- lm(sav~p75+inc+gro) # fit the model without p15
+ip(g2$res, g2$res) # the RSS_omega
+(797.7234-650.706)/(650.706/45) # the F-statistic
+sqrt(10.16708) # t-statistics is square root of the F-statistics,
+```
+
+Check if it agrees with the result in summary of g (except for the sign).
+
+```{r}
+2*(1-pt(3.188586, 45)) # compute the tail probability --- the command "pt" returns the cdf value of a t distribution. (Q: why multiplied by 2? Ans: it's a two-sided test)
+```
+
+It should agree with the p-value in summary of g.
+
+```{r}
+anova(g2, g) # a convenient way to compare two models, one nested in another
+```
+
+## Testing a pair of predictors
+
+We can find that the t-tests for $\beta_{p75}$ and $\beta_{inc}$ are both insignificant from the summary of g (Q: Does this mean that both p75 and inc can be directly eliminated from the model?). We may therefore be interested in testing the pair of predictors: $H0: \beta_{p75}=\beta_{inc}=0$. For the test,
+
+$$
+\begin{align}
+\Omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, ~~~ & dim(\Omega)=5, ~~~ & df_\Omega=45 \\
+\omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{gro} gro + \epsilon, ~~~ & dim(\omega)=3, ~~~ & df_\omega=47
+\end{align}
+$$
+
+```{r}
+g3 <- lm(sav~p15+gro) # fit the model without p75 and inc
+anova(g3, g) # a convenient way to compare two models, one nested in another
+```
+
+Because the p-value is not extreme, there is not enough evidence to reject $H0: \beta_{p75}=\beta_{inc}=0$, when p15 and gro are in the model. 這意指兩個變數可以同時丟掉，不會影響對Y的解釋
+
+## Testing a subspace $\omega$　
+
+We might be interested in testing the hypothesis that the effect of young and old people on the savings rate (with estimated value -0.4612 and -1.6915, respectively, in the summary of g) was the same, i.e., test $H0: \beta_{p15}=\beta_{p75}$. For the test,
+
+$$
+\begin{align}
+\Omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, ~~~ & dim(\Omega)=5, ~~~ & df_\Omega=45 \\
+\omega: sav & = \beta_0 + \beta_{p15} (p15 + p75) + \beta_{inc} inc + \beta_{gro} gro + \epsilon, ~~~ & dim(\omega)=4, ~~~ & df_\omega=46
+\end{align}
+$$
+
+```{r}
+g4 <- lm(sav~I(p15+p75)+inc+gro) # The function "I()" ensures that the argument is evaluated rather than interpreted as part of the model formula
+anova(g4, g) # a convenient way to compare two models, one nested in another
+```
+
+We find that
+
+* the p-value of 0.2146 indicates that the null cannot be rejected here
+    + 可認定這兩個參數是一樣的
+    + 因為p75很小，而p15先前看到對解釋Y很有用，所以兩個相加跟和p15差不多的話，對解釋Y的能力會差不多．
+* it means that there is not evidence that young and old people need to be treated separately in the context of this particular model.
+
+## Testing a subset $\omega$
+
+Suppose that we want to test whether one of the coefficients can be set to a particular value. For example, test $H0: \beta_{gro}=1$ (the estimated value of bgro is 0.4097 in the summary of g). For the test,
+
+$$
+\begin{align}
+\Omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \beta_{gro} gro + \epsilon, ~~~ & dim(\Omega)=5, ~~~ & df_\Omega=45 \\
+\omega: sav & = \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + gro + \epsilon, ~~~ & dim(\omega)=4, ~~~ & df_\Omega=46
+\end{align}
+$$
+
+Notice that now in $\omega$ there is a fixed coefficient on the gro term. Such a fixed term in the regression equation is called an offset.
+
+```{r}
+g5 <- lm(sav~p15+p75+inc+offset(gro)) # An offset is a term to be added to a linear predictor. The command "offset" is used to include an offset into model
+anova(g5, g) # a convenient way to compare two models, one nested in another
+```
+
+We see that the p-value is large and the null hypothesis here is rejected. 也就是說$\beta_{gro}$不像是1．
+
+An alternative is to use t-test:
+
+```{r}
+(0.4096998-1)/0.1961961 # t-statistic (Q: where in the summary of g can you find the estimate of bgro and its standard error?)
+2*pt(-3.008725, 45) # p-value (times 2 for two-sided)
+(-3.008725)^2 # agree with the F-statistic?
+```
+　
+Note that in the model g5, these is an offset term (i.e., gro). To fit a linear model with offset, can we use the response minus the offset (i.e., sav-gro) as a new response? That is, fit the model
+
+$$sav - gro= \beta_0 + \beta_{p15} p15 + \beta_{p75} p75 + \beta_{inc} inc + \epsilon$$
+
+Let us check how R handle the two models.
+
+```{r}
+g6 <- lm(I(sav-gro)~p15+p75+inc) # fit a model using the same predictors and a new response which equals the original response minus the offset 
+summary(g6) # take a look of the fitted model g6
+```
+
+```{r}
+summary(g5) # take a look of the fitted model g5
+```
+
+Compare the summary outputs of g6 and g5 and find what values are identical and what are different. Explain why they are identical or different?
+
+* $\beta$的估計值、test statistic、p-Value都一樣
+* $R^2$不一樣，Overall F-statistic不一樣
+    + 這是因為$\omega$是只帶著intercept的model
+
+```{r}
+head(cbind(g5$fit, g6$fit, g6$fit+gro)) # compare the fitted values under g5 and g6 models
+```
+
+```{r}
+sum(g5$fit*g5$res) # the inner product of fitted values and residuals under g5.
+```
+
+Note that in g5, the fitted values and residuals are not orthogonal.
+
+```{r}
+sum(g6$fit*g6$res) # the inner product of fitted values and residuals under g6.
+```
+
+Note that in g6, the fitted values and residuals are orthogonal.
+
+For your information, to test a general linear hypothesis $H0:A\beta=c$ in R, you can use the "linear.hypothesis" command in "car" package. Take a look of its document for more information.
