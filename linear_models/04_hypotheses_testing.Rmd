@@ -78,7 +78,7 @@ $$
 \end{align}
 $$
 
-$$F=\frac{(RSS_\omega-RSS_\Omega)/(df_\omega-df_\Omega)}{RSS_\Omega/df_\Omega}$$
+$$F=\frac{(RSS_\omega-RSS_\Omega)/(df_\omega-df_\Omega)}{RSS_\Omega/df_\Omega} \sim F_{df_\omega-df_\Omega,df_\Omega}$$
 
 看overall F要注意，F如果變大，$R^2$也會變大．但樣大時，有可能F很大(extreme significant)，但$R^2$很小．這將造成每個參數值都很小，但對Y的解釋有顯著貢獻．
 
@@ -92,6 +92,8 @@ Notice that
     + 在這因為有50個樣本，而有5個未知參數．
     + 45就是50-5．這也就是residual的degree of freedom．
     + 報告中的4是因為$df_\omega-df_\Omega$
+        + 這就是LNp.4-7的$\hat{\epsilon}_\omega-\hat{\epsilon}_\Omega$
+        + Residual向量差的維度
     
 * although the overall F-test is significant, the R2(=0.3385) is not very high. Only 33.85% of the variation in Savings is explained by the predictors.
     + However, it is difficult to judge whether such an R2 is much lower than expectation when we don't have further background information about the data.
